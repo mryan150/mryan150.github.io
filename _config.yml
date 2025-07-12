@@ -1,0 +1,69 @@
+# GitHub Pages Configuration for Barony of Andelcrag
+
+# Site settings
+title: "Barony of Andelcrag"
+description: "Official website of the Barony of Andelcrag, Middle Kingdom, Society for Creative Anachronism"
+url: "https://your-username.github.io"
+baseurl: "/BaronyOfAndelcrag"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+theme: minima
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - README.md
+  - LICENSE
+  - CNAME
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+
+# SEO and social
+author: "Barony of Andelcrag Web Minister"
+twitter:
+  username: 
+facebook:
+  username:
+
+# Copyright
+copyright: "© 2024 Barony of Andelcrag, SCA, Inc."
+
+# Collections (for future expansion)
+collections:
+  events:
+    output: true
+    permalink: /:collection/:name/
+  officers:
+    output: true
+    permalink: /:collection/:name/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+      author: "Barony of Andelcrag"
+  - scope:
+      path: ""
+      type: "events"
+    values:
+      layout: "event"
+  - scope:
+      path: ""
+      type: "officers"
+    values:
+      layout: "officer" 

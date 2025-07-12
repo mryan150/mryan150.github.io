@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barony of Andelcrag - Middle Kingdom, SCA</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Barony of Andelcrag</h1>
+            <p class="subtitle">Middle Kingdom • Society for Creative Anachronism</p>
+        </div>
+    </header>
+
+    <!-- Image Carousel -->
+    <div class="carousel-container">
+        <div class="carousel">
+            <div class="carousel-slide active">
+                <img src="images/Untitled-1.jpg" alt="Barony of Andelcrag Event Photo">
+            </div>
+            <div class="carousel-slide">
+                <img src="images/Untitled-2-e1661992680510.jpg" alt="Barony of Andelcrag Event Photo">
+            </div>
+            <div class="carousel-slide">
+                <img src="images/Untitled-4.jpg" alt="Barony of Andelcrag Event Photo">
+            </div>
+            <div class="carousel-slide">
+                <img src="images/cropped-cropped-AndelcragDevice-1.png" alt="Barony of Andelcrag Device">
+            </div>
+            <div class="carousel-slide">
+                <img src="images/Balcony-banners-scaled.jpg" alt="Barony of Andelcrag Banners">
+            </div>
+            <div class="carousel-slide">
+                <img src="images/A-fine-spread-1-scaled.jpg" alt="Barony of Andelcrag Feast">
+            </div>
+        </div>
+        
+        <!-- Navigation arrows -->
+        <button class="carousel-btn prev" onclick="changeSlide(-1)">&#10094;</button>
+        <button class="carousel-btn next" onclick="changeSlide(1)">&#10095;</button>
+        
+        <!-- Dot indicators -->
+        <div class="carousel-dots">
+            <span class="dot active" onclick="currentSlide(1)"></span>
+            <span class="dot" onclick="currentSlide(2)"></span>
+            <span class="dot" onclick="currentSlide(3)"></span>
+            <span class="dot" onclick="currentSlide(4)"></span>
+            <span class="dot" onclick="currentSlide(5)"></span>
+            <span class="dot" onclick="currentSlide(6)"></span>
+        </div>
+    </div>
+
+    <nav>
+        <div class="container">
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#officers">Officers</a></li>
+                <li><a href="#events">Events</a></li>
+                <li><a href="#newcomers">Newcomers</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <section id="home" class="hero">
+            <div class="container">
+                <h2>Welcome to the Barony of Andelcrag</h2>
+                <p class="hero-text">We are part of the Middle Kingdom in the Society for Creative Anachronism (SCA), an international organization dedicated to researching and re-creating the arts and skills of pre-17th-century Europe.</p>
+                
+                <div class="baronial-leadership">
+                    <h3>Their Excellencies</h3>
+                    <div class="baroness-info">
+                        <div class="baroness">
+                            <h4>Baroness Thomasette de Harfleur</h4>
+                        </div>
+                        <div class="baroness">
+                            <h4>Baroness Adallisia moglie di Simon Varzi</h4>
+                        </div>
+                    </div>
+                    <p class="contact-info">Contact Their Excellencies: <a href="mailto:baronyofandelcrag@gmail.com">baronyofandelcrag@gmail.com</a></p>
+                    <p class="chamberlains">Chamberlains: THL Melike bint Nikola and Lord Sietz Kirbrich</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="officers" class="officers-section">
+            <div class="container">
+                <h2>Baronial Officers</h2>
+                <div class="officers-grid">
+                    <div class="officer">
+                        <h3>Seneschal (President)</h3>
+                        <p><strong>Lord Sigurðr Sighvatrsson</strong></p>
+                        <p class="modern-name">(Jon Cornell)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Treasurer (Exchequer)</h3>
+                        <p><strong>Lord Walter le Mareshall</strong></p>
+                        <p class="modern-name">(Scott Marshall)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>New Member Liaison (Chatelaine)</h3>
+                        <p><strong>Lord Ahikaga Tatsukage</strong></p>
+                        <p class="modern-name">(James White)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Herald/Pursuivant</h3>
+                        <p><strong>Lord Edward the Stranger</strong></p>
+                        <p class="modern-name">(Emrys Schoumacher Bailey)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Minister of Youth</h3>
+                        <p><strong>Lady Morgan Wynn De Byrd</strong></p>
+                        <p class="modern-name">(Windi Sievers)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Armored Combat Marshal</h3>
+                        <p><strong>Baron Armand de Chartres</strong></p>
+                        <p class="modern-name">(Daniel Pipe II)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Minister of Arts and Sciences</h3>
+                        <p><strong>Lord Ulrich Eisnehart</strong></p>
+                        <p class="modern-name">(Scott Wright)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Rapier Combat Marshal</h3>
+                        <p><strong>Vacant</strong></p>
+                        <p class="modern-name">Email Lord Sietz Kirbrich (Robert Helm) if interested</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Chronicler</h3>
+                        <p><strong>Lady Isobella Gray</strong></p>
+                        <p class="modern-name">(Alanna Fitzgerald)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Archery Marshal</h3>
+                        <p><strong>Forester Geneviéfvé Jacqueline de Gris O.D.B.</strong></p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Social Media Officer</h3>
+                        <p><strong>The Honorable Lady Sgt. Melike bint Nikola</strong></p>
+                        <p class="modern-name">(Millicent Ryan)</p>
+                    </div>
+                    
+                    <div class="officer">
+                        <h3>Web Minister</h3>
+                        <p><strong>Lord Sai'd al-Abzari</strong></p>
+                        <p class="modern-name">(Mitchell Ryan)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="events" class="events-section">
+            <div class="container">
+                <h2>Events & Activities</h2>
+                <p>Stay tuned for upcoming events and activities. Check back regularly for updates on:</p>
+                <ul>
+                    <li>Baronial meetings and courts</li>
+                    <li>Fighter practice sessions</li>
+                    <li>Arts and Sciences workshops</li>
+                    <li>Social gatherings and feasts</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="newcomers" class="newcomers-section">
+            <div class="container">
+                <h2>New to the SCA?</h2>
+                <p>Welcome! The Society for Creative Anachronism (SCA) is an international organization dedicated to researching and re-creating the arts and skills of pre-17th-century Europe. We study and practice medieval and Renaissance arts, crafts, combat, and culture.</p>
+                <p>If you're interested in joining us or learning more about what we do, please contact our Chatelaine (New Member Liaison):</p>
+                <div class="contact-card">
+                    <p><strong>Lord Ahikaga Tatsukage</strong> (James White)</p>
+                    <p>Or reach out to us at: <a href="mailto:baronyofandelcrag@gmail.com">baronyofandelcrag@gmail.com</a></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="contact-section">
+            <div class="container">
+                <h2>Contact Information</h2>
+                <div class="contact-grid">
+                    <div class="contact-item">
+                        <h3>General Inquiries</h3>
+                        <p><a href="mailto:baronyofandelcrag@gmail.com">baronyofandelcrag@gmail.com</a></p>
+                    </div>
+                    
+                    <div class="contact-item">
+                        <h3>Social Media</h3>
+                        <p><strong>THL Melike bint Nikola</strong></p>
+                    </div>
+                    
+                    <div class="contact-item">
+                        <h3>Website</h3>
+                        <p><strong>Lord Sai'd al-Abzari</strong></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>This is the recognized website for the Barony of Andelcrag of the Society for Creative Anachronism, Inc., and is maintained by Lord Sa'id Al-Abzari. This site may contain electronic versions of the group's governing documents. Any discrepancies between the electronic version of any information on this site and the printed version that is available from the originating office will be decided in favor of the printed version. For information on using photographs, articles, or artwork from this website, please contact the Webminister at <a href="mailto:andelcrag.webminister@midrealm.org">andelcrag.webminister@midrealm.org</a>. He or she will assist you in contacting the original creator of the piece. Please respect the legal rights of our contributors.</p>
+            <p>Copyright © 2022 Barony of Andelcrag. The original contributors retain the copyright of certain portions of this site.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Simple smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Mobile menu toggle (basic implementation)
+        const navLinks = document.querySelector('.nav-links');
+        const menuToggle = document.createElement('button');
+        menuToggle.innerHTML = '☰';
+        menuToggle.className = 'menu-toggle';
+        menuToggle.addEventListener('click', () => {
+            navLinks.classList.toggle('active');
+        });
+        document.querySelector('nav .container').appendChild(menuToggle);
+
+        // Carousel functionality
+        let currentSlideIndex = 0;
+        const slides = document.querySelectorAll('.carousel-slide');
+        const dots = document.querySelectorAll('.dot');
+        const totalSlides = slides.length;
+
+        function showSlide(index) {
+            // Hide all slides
+            slides.forEach(slide => slide.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+            
+            // Show current slide
+            slides[index].classList.add('active');
+            dots[index].classList.add('active');
+        }
+
+        function changeSlide(direction) {
+            currentSlideIndex += direction;
+            
+            if (currentSlideIndex >= totalSlides) {
+                currentSlideIndex = 0;
+            } else if (currentSlideIndex < 0) {
+                currentSlideIndex = totalSlides - 1;
+            }
+            
+            showSlide(currentSlideIndex);
+        }
+
+        function currentSlide(index) {
+            currentSlideIndex = index - 1;
+            showSlide(currentSlideIndex);
+        }
+
+        // Auto-advance carousel every 5 seconds
+        setInterval(() => {
+            changeSlide(1);
+        }, 5000);
+
+        // Pause auto-advance on hover
+        const carouselContainer = document.querySelector('.carousel-container');
+        let autoAdvance = setInterval(() => {
+            changeSlide(1);
+        }, 5000);
+
+        carouselContainer.addEventListener('mouseenter', () => {
+            clearInterval(autoAdvance);
+        });
+
+        carouselContainer.addEventListener('mouseleave', () => {
+            autoAdvance = setInterval(() => {
+                changeSlide(1);
+            }, 5000);
+        });
+    </script>
+</body>
+</html> 
