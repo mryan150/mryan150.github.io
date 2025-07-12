@@ -341,10 +341,31 @@ h4 {
     border-color: #000000;
 }
 
+.officer strong a {
+    color: #000000;
+    text-decoration: none;
+}
+
+.officer strong a:hover {
+    color: #ffd700;
+    text-decoration: underline;
+}
+
 .modern-name {
     font-style: italic;
     color: #666;
     font-size: 0.9rem;
+}
+
+.modern-name a {
+    color: #000000;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.modern-name a:hover {
+    color: #ffd700;
+    text-decoration: underline;
 }
 
 .contact {
@@ -355,6 +376,16 @@ h4 {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     display: inline-block;
+}
+
+.contact a {
+    color: #000000;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.contact a:hover {
+    text-decoration: underline;
 }
 
 /* Events Section */
@@ -403,6 +434,21 @@ h4 {
 .contact-card a:hover {
     background-color: #ffed4e;
     text-decoration: none;
+}
+
+.contact-card strong a {
+    color: #000000;
+    text-decoration: none;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    display: inline;
+}
+
+.contact-card strong a:hover {
+    color: #ffd700;
+    text-decoration: underline;
+    background: none;
 }
 
 /* Contact Section */
@@ -456,6 +502,17 @@ footer {
 footer p {
     margin-bottom: 1rem;
     opacity: 0.9;
+}
+
+footer a {
+    color: #ffd700;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+footer a:hover {
+    color: #ffed4e;
+    text-decoration: underline;
 }
 
 /* Responsive Design */
