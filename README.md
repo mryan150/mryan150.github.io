@@ -1,85 +1,85 @@
-# Barony of Andelcrag Website
+# The Bard Game - Web Demo
 
-This is the official website for the Barony of Andelcrag, Middle Kingdom, Society for Creative Anachronism (SCA).
+A playable web implementation of the Bard Game concept, where you play as a traveling bard whose stories literally shape the world around you.
 
-## Setup Instructions for GitHub Pages
+## How to Play
 
-### 1. Repository Setup
-1. Create a new repository on GitHub (name it `BaronyOfAndelcrag` or similar)
-2. Upload all the files from this directory to the repository
-3. Go to repository Settings > Pages
-4. Under "Source", select "Deploy from a branch"
-5. Select "main" branch and "/ (root)" folder
-6. Click "Save"
+1. **Open the game**: Simply open `index.html` in your web browser
+2. **Objective**: Earn 10,000 gold to retire in comfort!
 
-### 2. Configuration
-1. Edit `_config.yml` and update the following:
-   - Replace `your-username` with your actual GitHub username
-   - Update the `baseurl` if you named your repository differently
-   - Add social media usernames if desired
+## Gameplay Flow
 
-### 3. Custom Domain (Optional)
-If you want to use a custom domain like `andelcrag.midrealm.org`:
-1. Create a file named `CNAME` in the root directory
-2. Add your domain name to the file (one line, no http://)
-3. Configure your domain's DNS to point to GitHub Pages
+### ☀️ Day Phase - Information Gathering
+- **Visit locations** around the town by clicking on them
+- **Talk to NPCs** to gather information about the town and its people
+- **Limited conversations**: You can only have **4 conversations per day** - choose wisely!
+- **One conversation per NPC**: Once you've talked to someone, you can't talk to them again that day
+- **Collect different types of information**:
+  - ✅ **CONFIRMED**: Direct observations (most reliable)
+  - ❓ **RUMORED**: Hearsay and gossip (uncertain reliability)
+  - ❌ **MADE UP**: Pure fiction from your imagination
+- **Gather at least 3 pieces of information** before proceeding to evening (or use all your conversations)
 
-### 4. Content Updates
-To update the website content:
-1. Edit `index.html` directly for quick changes
-2. Modify `styles.css` for styling changes
-3. Changes will automatically deploy when pushed to the main branch
+### 🌙 Evening Phase - Story Crafting
+- **Craft your story** using the classic 3-act structure:
+  - **Act I**: Choose your setting and setup
+  - **Act II**: Choose the conflict and adventure
+  - **Act III**: Choose the resolution and outcome
+- **Use gathered information** to make your story more believable and impactful
+- **Preview your story** before telling it to see how it flows
 
-## Features
+### 🎭 Night Phase - Performance Results
+- **View audience reactions** to your story
+- **Earn gold** based on your performance (base fee + tips)
+- **Pay inn costs** - 5 gold per night for lodging
+- **See immediate consequences** of your story on the townspeople
+- **Build reputation** that affects future performances
+- **Manage bankruptcy risk** - running out of gold ends the game!
 
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Modern Layout**: Clean, professional appearance
-- **SEO Optimized**: Good search engine visibility
-- **Easy to Update**: Simple HTML structure for easy maintenance
-- **Accessible**: Screen reader friendly and keyboard navigable
+## Game Features
 
-## Sections Included
+- **Dynamic storytelling system** with multiple story paths
+- **Consequence system** where your stories affect the world
+- **Information gathering** with different reliability levels
+- **Character progression** through reputation and wealth
+- **Rich medieval atmosphere** with detailed NPCs and locations
 
-1. **Home**: Welcome message and baronial leadership
-2. **Officers**: Complete list of baronial officers with contact info
-3. **Events**: Placeholder for upcoming events
-4. **Newcomers**: Information for new SCA members
-5. **Contact**: Contact information and key personnel
+## Story Elements
 
-## Adding Content
+Your stories combine three types of information:
 
-### Adding Events
-Create new events by editing the Events section in `index.html` or by creating individual event files in a `_events` folder.
+1. **Confirmed Facts**: Based on direct observations and reliable sources
+2. **Rumors**: Based on gossip and uncertain information
+3. **Made-up Elements**: Pure fantasy from your imagination
 
-### Adding News/Updates
-Add news items to the homepage or create a news section by modifying the HTML structure.
+The mix of these elements affects how your audience receives your story and what consequences unfold.
 
-### Adding Images
-1. Create an `images` folder in your repository
-2. Upload images to the folder
-3. Reference them in HTML with `<img src="images/filename.jpg" alt="description">`
+## Tips for Success
 
-## Maintenance
-
-- Regular updates to officer information
-- Event calendar maintenance
-- Content updates as needed
-- Periodic review of contact information
+- **Plan your conversations carefully** - you only get 4 per day!
+- **Manage your finances** - earn at least 5 gold per night to afford lodging
+- **Gather diverse information** from multiple sources
+- **Use confirmed facts** for more believable stories
+- **Mix truth with fiction** to create compelling narratives
+- **Pay attention to consequences** - your stories shape the world
+- **Build reputation** to earn more gold and unlock opportunities
+- **Strategic choices matter** - some NPCs might have more valuable information than others
+- **Watch your gold carefully** - bankruptcy means game over!
 
 ## Technical Notes
 
-- Built with HTML5, CSS3, and vanilla JavaScript
-- Uses Google Fonts (Cinzel and Open Sans)
-- Responsive grid layout
-- Smooth scrolling navigation
-- Print-friendly styles included
+- **Browser compatibility**: Works in all modern browsers
+- **No installation required**: Just open `index.html`
+- **Responsive design**: Plays well on desktop and mobile
+- **Local storage**: Game progress is saved locally
 
-## Contact
+## Game Structure
 
-For technical issues with the website, contact the Web Minister:
-- **Lord Sai'd al-Abzari** (Mitchell Ryan)
-- Email: baronyofandelcrag@gmail.com
+The demo includes:
+- **4 unique locations** to explore
+- **Multiple NPCs** with distinct personalities and information
+- **Dynamic story generation** based on your choices
+- **Consequence system** that shows immediate effects
+- **Progression tracking** toward your retirement goal
 
----
-
-*This website is maintained by the Barony of Andelcrag Web Minister and is the official website for the Barony of Andelcrag of the Society for Creative Anachronism, Inc.* 
+Enjoy your journey as a traveling bard! 🎭✨ 
