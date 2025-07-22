@@ -12,9 +12,11 @@
             <h1>🎭 The Bard Game</h1>
             <div class="player-stats">
                 <span class="gold">💰 Gold: <span id="gold">500</span></span>
-                <span class="reputation">⭐ Reputation: <span id="reputation">Unknown</span></span>
+                <span class="reputation">⭐ Reputation: <span id="reputation">Neutral</span></span>
                 <span class="day-counter">📅 Day: <span id="day">1</span></span>
+                <span class="town-counter">🏘️ Town: <span id="town-number">1</span></span>
                 <span class="conversations">💬 Conversations: <span id="conversations">4/4</span></span>
+                <span class="inventory-summary">📦 Supplies: <span id="supplies-count">0</span></span>
             </div>
         </header>
 
@@ -23,28 +25,13 @@
             <div id="day-phase" class="phase">
                 <h2>☀️ Day Phase - Gather Information</h2>
                 <div class="town-info">
-                    <h3>Town of Millbrook</h3>
-                    <p>A small trading town nestled in the valley, known for its weekly market and old mine.</p>
+                    <h3 id="town-name">Loading...</h3>
+                    <p id="town-description">Generating a unique town for your adventure...</p>
                     <p style="font-size: 0.9em; color: #ffa500; font-style: italic;">💡 You can have up to 4 conversations per day. Choose wisely who you talk to!</p>
                 </div>
                 
-                <div class="locations">
-                    <div class="location" onclick="visitLocation('tavern')">
-                        <h4>🍺 The Jolly Merchant Tavern</h4>
-                        <p>The local gathering place where merchants and travelers share news</p>
-                    </div>
-                    <div class="location" onclick="visitLocation('market')">
-                        <h4>🏪 Market Square</h4>
-                        <p>Bustling with activity during the day, full of traders and townspeople</p>
-                    </div>
-                    <div class="location" onclick="visitLocation('mine')">
-                        <h4>⛏️ The Old Mine</h4>
-                        <p>Abandoned years ago, but locals still whisper about it</p>
-                    </div>
-                    <div class="location" onclick="visitLocation('mayor')">
-                        <h4>🏛️ Mayor's Office</h4>
-                        <p>The seat of local government and official business</p>
-                    </div>
+                <div class="locations" id="locations-container">
+                    <!-- Locations will be generated dynamically -->
                 </div>
 
                 <div class="gathered-info">
@@ -58,6 +45,10 @@
             <!-- Evening Phase -->
             <div id="evening-phase" class="phase hidden">
                 <h2>🌙 Evening Phase - Craft Your Story</h2>
+                
+                <div id="audience-preview" class="audience-section">
+                    <!-- Audience will be populated dynamically -->
+                </div>
                 
                 <div class="story-crafting">
                     <div class="act-section">
