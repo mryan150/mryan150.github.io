@@ -10,13 +10,13 @@ body {
     background: linear-gradient(135deg, #2c1810 0%, #4a3728 100%);
     color: #f4e4c1;
     min-height: 100vh;
-    line-height: 1.6;
+    line-height: 1.4;
 }
 
 .game-container {
-    max-width: 1200px;
+    max-width: 1000px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 10px;
 }
 
 /* Header Styles */
@@ -24,17 +24,17 @@ body {
     background: linear-gradient(45deg, #8b4513 0%, #a0522d 100%);
     border: 3px solid #daa520;
     border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 10px;
+    margin-bottom: 10px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     text-align: center;
 }
 
 .game-header h1 {
-    font-size: 2.5em;
+    font-size: 1.9em;
     color: #daa520;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 .player-stats {
@@ -46,10 +46,11 @@ body {
 
 .player-stats span {
     background: rgba(0,0,0,0.3);
-    padding: 8px 16px;
-    border-radius: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
     font-weight: bold;
     border: 1px solid #daa520;
+    font-size: 0.85em;
 }
 
 /* Main Game Area */
@@ -57,8 +58,8 @@ body {
     background: linear-gradient(45deg, #3d2f20 0%, #5a4a38 100%);
     border: 2px solid #8b4513;
     border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 20px;
+    padding: 12px;
+    margin-bottom: 10px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
@@ -73,11 +74,11 @@ body {
 
 .phase h2 {
     color: #daa520;
-    font-size: 1.8em;
-    margin-bottom: 20px;
+    font-size: 1.3em;
+    margin-bottom: 10px;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
     border-bottom: 2px solid #8b4513;
-    padding-bottom: 10px;
+    padding-bottom: 6px;
 }
 
 /* Town Info */
@@ -85,8 +86,8 @@ body {
     background: rgba(139, 69, 19, 0.2);
     border: 1px solid #8b4513;
     border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
+    padding: 8px;
+    margin-bottom: 10px;
 }
 
 .town-info h3 {
@@ -97,9 +98,9 @@ body {
 /* Location Styles */
 .locations {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 15px;
-    margin-bottom: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
 }
 
 .location {
@@ -133,9 +134,9 @@ body {
     background: rgba(0,0,0,0.2);
     border: 1px solid #8b4513;
     border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
-    min-height: 100px;
+    padding: 8px;
+    margin-bottom: 10px;
+    min-height: 60px;
 }
 
 .gathered-info h3 {
@@ -174,8 +175,8 @@ body {
     background: rgba(0,0,0,0.2);
     border: 1px solid #8b4513;
     border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
+    padding: 8px;
+    margin-bottom: 10px;
 }
 
 .audience-section h3 {
@@ -218,15 +219,15 @@ body {
 
 /* Story Crafting */
 .story-crafting {
-    margin-bottom: 25px;
+    margin-bottom: 12px;
 }
 
 .act-section {
     background: rgba(0,0,0,0.2);
     border: 1px solid #8b4513;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 10px;
+    margin-bottom: 10px;
 }
 
 .act-section h3 {
@@ -285,9 +286,9 @@ body {
     background: rgba(0,0,0,0.3);
     border: 1px solid #8b4513;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-    min-height: 150px;
+    padding: 10px;
+    margin-bottom: 10px;
+    min-height: 80px;
 }
 
 .story-preview h3 {
@@ -378,8 +379,8 @@ button:disabled {
     background: rgba(0,0,0,0.2);
     border: 1px solid #8b4513;
     border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
+    padding: 8px;
+    margin-bottom: 10px;
 }
 
 .audience-reaction h3, .earnings h3, .consequences h3 {
@@ -430,7 +431,7 @@ button:disabled {
     background: linear-gradient(45deg, #8b4513 0%, #a0522d 100%);
     border: 2px solid #daa520;
     border-radius: 8px;
-    padding: 15px;
+    padding: 8px;
     text-align: center;
     color: #f4e4c1;
 }
@@ -442,7 +443,7 @@ button:disabled {
 /* Responsive Design */
 @media (max-width: 768px) {
     .game-container {
-        padding: 10px;
+        padding: 6px;
     }
     
     .player-stats {
@@ -455,12 +456,16 @@ button:disabled {
     }
     
     .game-header h1 {
-        font-size: 2em;
+        font-size: 1.6em;
+    }
+    
+    .phase h2 {
+        font-size: 1.2em;
     }
     
     .modal-content {
         width: 95%;
-        padding: 20px;
+        padding: 12px;
     }
 }
 
