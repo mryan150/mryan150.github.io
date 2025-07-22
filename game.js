@@ -34,7 +34,12 @@ let gameState = {
     townNumber: 1, // Track which town we're in
     daysSinceLastMove: 0, // Track how long in current town
     bannedFromTown: false, // Flag for being chased out
-    travelDanger: 50 // Base danger level for travel (0-100)
+    travelDanger: 50, // Base danger level for travel (0-100)
+    // Lose condition tracking
+    health: 100, // Health points (0-100)
+    consecutiveBadPerformances: 0, // Track string of bad performances
+    gameOverReason: null, // Track reason for game over
+    warningsGiven: 0 // Track warnings before exile
 };
 
 // Town/City Generation Data
@@ -100,10 +105,10 @@ const townGen = {
 // Character Generation Data
 const characterGen = {
     firstNames: {
-        male: ['Aldric', 'Bram', 'Cole', 'Dorin', 'Edric', 'Finn', 'Gareth', 'Hugh', 'Ivan', 'Joren', 'Kael', 'Lenn', 'Magnus', 'Nolan', 'Owen', 'Pike', 'Quinn', 'Roderick', 'Sean', 'Thane', 'Ulric', 'Viktor', 'Willem', 'Yorick', 'Zane'],
-        female: ['Anya', 'Brynn', 'Cara', 'Della', 'Elsa', 'Faye', 'Gwen', 'Hilda', 'Iris', 'Jana', 'Kira', 'Lena', 'Mara', 'Nina', 'Opal', 'Petra', 'Quinn', 'Rosa', 'Sara', 'Tara', 'Uma', 'Vera', 'Willa', 'Yvonne', 'Zara']
+        male: ['Aldric', 'Bram', 'Cole', 'Dorin', 'Edric', 'Finn', 'Gareth', 'Hugh', 'Ivan', 'Joren', 'Kael', 'Lenn', 'Magnus', 'Nolan', 'Owen', 'Pike', 'Quinn', 'Roderick', 'Sean', 'Thane', 'Ulric', 'Viktor', 'Willem', 'Yorick', 'Zane', 'Alaric', 'Ansel', 'Arden', 'Armin', 'Arne', 'Axel', 'Baldur', 'Barnaby', 'Bastian', 'Benedict', 'Bertram', 'Bjorn', 'Bodhi', 'Boris', 'Brand', 'Brock', 'Cadmus', 'Caius', 'Caspian', 'Cedric', 'Cillian', 'Clarence', 'Conrad', 'Corbin', 'Cormac', 'Crispin', 'Cyrus', 'Damian', 'Darius', 'Declan', 'Demetrius', 'Destin', 'Dorian', 'Drystan', 'Eamon', 'Einar', 'Elias', 'Emil', 'Enzo', 'Ewan', 'Fabian', 'Felix', 'Fergus', 'Finnian', 'Florian', 'Flynn', 'Gideon', 'Godfrey', 'Griffin', 'Gunther', 'Hadrian', 'Hamish', 'Hector', 'Henrik', 'Horatio', 'Igor', 'Ingram', 'Jago', 'Jaromir', 'Jasper', 'Jedediah', 'Jethro', 'Joachim', 'Jonas', 'Jude', 'Julian', 'Kai', 'Killian', 'Lars', 'Leander', 'Leif', 'Leopold', 'Llewellyn', 'Lucian', 'Ludovic', 'Luther', 'Lysander', 'Malachi', 'Marius', 'Maxim', 'Milo', 'Misha', 'Nikolai', 'Odin', 'Orion', 'Orson', 'Oscar', 'Oswald', 'Percival', 'Phineas', 'Randolph', 'Raphael', 'Remy', 'Rhett', 'Rhys', 'Rohan', 'Roland', 'Roman', 'Ronan', 'Rory', 'Rufus', 'Rupert', 'Rylan', 'Sampson', 'Samson', 'Saul', 'Sebastian', 'Silas', 'Soren', 'Stellan', 'Sven', 'Tadhg', 'Tage', 'Talon', 'Tavish', 'Tegan', 'Thaddeus', 'Theon', 'Thorin', 'Tiernan', 'Torin', 'Tristan', 'Tyrone', 'Ulysses', 'Uriah', 'Valentin', 'Vaughn', 'Viggo', 'Vincent', 'Vladimir', 'Walden', 'Walter', 'Warren', 'Wolfgang', 'Xander', 'Xavier', 'Yannick', 'Zebulon'],
+        female: ['Anya', 'Brynn', 'Cara', 'Della', 'Elsa', 'Faye', 'Gwen', 'Hilda', 'Iris', 'Jana', 'Kira', 'Lena', 'Mara', 'Nina', 'Opal', 'Petra', 'Quinn', 'Rosa', 'Sara', 'Tara', 'Uma', 'Vera', 'Willa', 'Yvonne', 'Zara', 'Acacia', 'Adela', 'Adeline', 'Aibhlinn', 'Aida', 'Ailis', 'Aine', 'Alba', 'Allegra', 'Alma', 'Althea', 'Amara', 'Anika', 'Annelise', 'Aoife', 'Aria', 'Astrid', 'Aurelia', 'Aurora', 'Beatrix', 'Bellatrix', 'Bernadette', 'Bianca', 'Bronwyn', 'Calla', 'Calliope', 'Calypso', 'Camilla', 'Cassia', 'Celeste', 'Celia', 'Cerys', 'Cleo', 'Clover', 'Coralie', 'Cordelia', 'Cosima', 'Dahlia', 'Danae', 'Daphne', 'Delphine', 'Demelza', 'Echo', 'Elara', 'Elora', 'Elowen', 'Enya', 'Estelle', 'Eudora', 'Faline', 'Fallon', 'Ffion', 'Fiona', 'Fleur', 'Freya', 'Galina', 'Genevieve', 'Ginevra', 'Giselle', 'Greta', 'Guinevere', 'Hazel', 'Helena', 'Honora', 'Imogen', 'Indira', 'Iona', 'Isadora', 'Isolde', 'Jocelyn', 'Juniper', 'Kaia', 'Katya', 'Kerensa', 'Lark', 'Lavinia', 'Leona', 'Lilith', 'Linnea', 'Lorelei', 'Lucia', 'Luna', 'Lyra', 'Maeve', 'Maren', 'Mila', 'Minerva', 'Mirabel', 'Moira', 'Morgana', 'Nadia', 'Niamh', 'Odessa', 'Olympia', 'Ophelia', 'Orla', 'Paloma', 'Pandora', 'Phoebe', 'Poppy', 'Primrose', 'Ramona', 'Rhiannon', 'Rowan', 'Sabina', 'Sabrina', 'Saffron', 'Saoirse', 'Saskia', 'Seraphina', 'Shona', 'Sloane', 'Sorcha', 'Sylvia', 'Tamsin', 'Tatum', 'Tessa', 'Thalia', 'Thea', 'Theodora', 'Tilda', 'Twyla', 'Una', 'Ursula', 'Valentina', 'Viola', 'Willow', 'Xanthe', 'Yseult', 'Zelda', 'Zinnia', 'Zosia']
     },
-    lastNames: ['Ashford', 'Blackwood', 'Cooper', 'Drake', 'Evans', 'Fletcher', 'Gray', 'Harper', 'Iron', 'Kane', 'Lane', 'Mason', 'North', 'Pike', 'Reed', 'Stone', 'Turner', 'Vale', 'Ward', 'Young'],
+    lastNames: ['Ashford', 'Blackwood', 'Cooper', 'Drake', 'Evans', 'Fletcher', 'Gray', 'Harper', 'Iron', 'Kane', 'Lane', 'Mason', 'North', 'Pike', 'Reed', 'Stone', 'Turner', 'Vale', 'Ward', 'Young', 'Aberdeen', 'Adair', 'Ainsworth', 'Albright', 'Alder', 'Allerton', 'Ambrose', 'Anson', 'Applegate', 'Arkwright', 'Armitage', 'Atherton', 'Atwood', 'Audley', 'Axton', 'Babcock', 'Bainbridge', 'Bancroft', 'Barlow', 'Barnaby', 'Barrett', 'Bartholomew', 'Bassett', 'Beckett', 'Bellamy', 'Bellingham', 'Blackburn', 'Blakely', 'Bradford', 'Branigan', 'Braxton', 'Brewster', 'Briscoe', 'Bromley', 'Brook', 'Buckley', 'Burnham', 'Byron', 'Cadogan', 'Callahan', 'Calvert', 'Caraway', 'Carlisle', 'Carrington', 'Cartwright', 'Chadwick', 'Chamberlain', 'Chapman', 'Chester', 'Clifford', 'Coburn', 'Colby', 'Colt', 'Connelly', 'Crawford', 'Cromwell', 'Dalton', 'Darcy', 'Davenport', 'Delaney', 'Dempsey', 'Donovan', 'Driscoll', 'Dudley', 'Edison', 'Ellington', 'Fairchild', 'Faraday', 'Fawcett', 'Fenn', 'Fenton', 'Finnegan', 'Fitzwilliam', 'Flanagan', 'Gable', 'Gallagher', 'Galloway', 'Garrison', 'Gatsby', 'Goodwin', 'Gresham', 'Grimshaw', 'Hale', 'Halloran', 'Hargrove', 'Hathaway', 'Hawthorne', 'Hayes', 'Hemlock', 'Huxley', 'Ingram', 'Jagger', 'Kavanagh', 'Keaton', 'Kensington', 'Kincaid', 'Kingsley', 'Lachlan', 'Landon', 'Langdon', 'Larkin', 'Lattimore', 'Leighton', 'Lennox', 'Llewellyn', 'Lockhart', 'Lovelace', 'Macaulay', 'Maddox', 'Mallory', 'McAllister', 'Montgomery', 'Morrigan', 'Mortimer', 'Murdock', 'Nightingale', 'Oakhurst', 'Ormsby', 'Pemberton', 'Pendleton', 'Penhaligon', 'Pettigrew', 'Pomeroy', 'Prescott', 'Quimby', 'Radcliffe', 'Rafferty', 'Ramsey', 'Redwood', 'Remington', 'Ridgeway', 'Rochford', 'Rutherford', 'Salinger', 'Salisbury', 'Sawyer', 'Schuyler', 'Sinclair', 'Slade', 'Somerset', 'Spencer', 'Stanton', 'Sterling', 'Sutton', 'Taggart', 'Talbot', 'Tate', 'Thackeray', 'Thorndike', 'Thorne', 'Tilton', 'Underwood', 'Vance', 'Wainwright', 'Wakefield', 'Walcott', 'Warrington', 'Wexford', 'Whittaker', 'Wickham', 'Winchester', 'Winthrop', 'Woodward', 'Wycliff', 'Yates', 'York'],
     professions: {
         tavern: ['Barkeep', 'Serving wench', 'Traveling bard', 'Retired soldier', 'Local drunk', 'Tavern cook'],
         market: ['Baker', 'Blacksmith', 'Merchant', 'Apprentice', 'Farmer', 'Weaver', 'Butcher'],
@@ -780,9 +785,9 @@ function initGame() {
 }
 
 function generateRetirementGoal() {
-    // Adjusted for rebalanced economy - target 12-20 successful performances
-    // With new income levels (200-500+ per night), this is achievable
-    gameState.retirementGoal = Math.floor(Math.random() * 4000) + 6000; // 6,000-10,000 gold
+    // Adjusted for rebalanced economy - target 6-12 successful performances
+    // With new income levels (200-500+ per night), this is very achievable
+    gameState.retirementGoal = Math.floor(Math.random() * 2001) + 2000; // 2,000-4,000 gold
     
     // Update all retirement goal displays
     const footerGoalElement = document.getElementById('footer-retirement-goal');
@@ -805,6 +810,20 @@ function updateInnCostDisplay() {
 
 function updateUI() {
     document.getElementById('gold').textContent = gameState.gold;
+    const healthElement = document.getElementById('health');
+    healthElement.textContent = gameState.health;
+    
+    // Add health warning colors
+    if (gameState.health <= 20) {
+        healthElement.style.color = '#dc143c';
+        healthElement.style.fontWeight = 'bold';
+    } else if (gameState.health <= 50) {
+        healthElement.style.color = '#ffa500';
+        healthElement.style.fontWeight = 'bold';
+    } else {
+        healthElement.style.color = '#32cd32';
+        healthElement.style.fontWeight = 'normal';
+    }
     document.getElementById('reputation').textContent = gameState.reputation;
     document.getElementById('day').textContent = gameState.day;
     document.getElementById('town-number').textContent = gameState.townNumber;
@@ -1973,9 +1992,13 @@ function generateAct3Choices() {
             // Generate contextual Act 3 text based on Acts 1 and 2
             let choiceText = generateAct3Text(act1Choice, act2Choice, theme, type, storyCharacters);
             
+            // Capitalize theme for display
+            const themeDisplay = theme.charAt(0).toUpperCase() + theme.slice(1);
+            const typeDisplay = type === 'madeUp' ? 'Fantastical' : (type === 'confirmed' ? 'Grounded' : 'Ambiguous');
+            
             choice.innerHTML = `
                 <div class="choice-text">${choiceText}</div>
-                <div class="choice-source">Tone: ${type === 'madeUp' ? 'Fantastical' : (type === 'confirmed' ? 'Grounded' : 'Ambiguous')}</div>
+                <div class="choice-source">${themeDisplay} (${typeDisplay})</div>
             `;
             
             choices.appendChild(choice);
@@ -2391,7 +2414,7 @@ function generatePerformanceResults() {
     ).join('');
     
     // Update gold (excluding inn cost for now - that happens when resting)
-    const performanceEarnings = earnings['Base Performance Fee'] + earnings['Audience Tips'];
+    const performanceEarnings = earnings['Base Performance Fee'] + earnings['Audience Tips'] + (earnings['Personal Bonuses'] || 0);
     gameState.gold += performanceEarnings;
     
     // Generate consequences
@@ -2405,6 +2428,12 @@ function generatePerformanceResults() {
     
     // Update reputation
     updateReputation(storyEffectiveness);
+    
+    // Track performance quality for lose conditions
+    trackPerformanceQuality(storyEffectiveness);
+    
+    // Check for lose condition warnings
+    checkLoseConditionWarnings(consequences);
     
     // Add reputation change to consequences if it changed
     if (gameState.reputation !== previousReputation) {
@@ -2568,13 +2597,25 @@ function determineStoryTone(story) {
     const act2 = story.act2 ? story.act2.theme : 'neutral';
     const act3 = story.act3 ? story.act3.theme : 'neutral';
     
-    // Act 3 has the most influence on overall tone
+    // Act 3 has the most influence on overall tone - expanded to match all character preferences
     if (act3 === 'triumph') {
-        return act2 === 'conflict' ? 'heroic' : 'triumphant';
+        // Triumph endings can have multiple positive tones
+        if (act2 === 'conflict') return 'heroic';
+        if (act2 === 'discovery') return 'uplifting'; 
+        if (act2 === 'adventure') return 'triumphant';
+        return 'triumphant'; // default triumph tone
     } else if (act3 === 'tragedy') {
-        return act2 === 'conflict' ? 'dramatic' : 'tragic';
+        // Tragedy endings focus on dramatic/cautionary elements
+        if (act2 === 'conflict') return 'dramatic';
+        if (act2 === 'discovery') return 'cautionary';
+        if (act2 === 'adventure') return 'tragic';
+        return 'dramatic'; // default tragedy tone
     } else if (act3 === 'change') {
-        return act2 === 'discovery' ? 'hopeful' : 'thoughtful';
+        // Change endings emphasize hope/growth/community
+        if (act2 === 'discovery') return 'hopeful';
+        if (act2 === 'conflict') return 'political'; 
+        if (act2 === 'adventure') return 'heartwarming';
+        return 'hopeful'; // default change tone
     }
     
     // Fallback based on Act 2 if Act 3 not available
@@ -2586,15 +2627,18 @@ function determineStoryTone(story) {
 }
 
 function isOpposingTone(preferredTone, storyTone) {
-    // Define opposing tones that clash with each other
+    // Define opposing tones that clash with each other - expanded for all character preferences
     const opposingPairs = {
-        'triumphant': ['tragic', 'dramatic'],
-        'tragic': ['triumphant', 'heroic', 'uplifting'],
-        'heroic': ['tragic'],
-        'dramatic': ['triumphant', 'hopeful'],
-        'hopeful': ['tragic', 'dramatic'],
-        'uplifting': ['tragic', 'dramatic'],
-        'exciting': ['tragic'],
+        'triumphant': ['tragic', 'dramatic', 'cautionary'],
+        'tragic': ['triumphant', 'heroic', 'uplifting', 'heartwarming'],
+        'heroic': ['tragic', 'cautionary'],
+        'dramatic': ['triumphant', 'hopeful', 'uplifting', 'heartwarming'],
+        'hopeful': ['tragic', 'dramatic', 'cautionary'],
+        'uplifting': ['tragic', 'dramatic', 'cautionary'],
+        'heartwarming': ['tragic', 'dramatic', 'cautionary'],
+        'cautionary': ['triumphant', 'uplifting', 'heartwarming', 'heroic'],
+        'political': ['heartwarming'], // Political stories might clash with purely emotional ones
+        'exciting': ['tragic', 'cautionary'],
         'thoughtful': ['dramatic']
     };
     
@@ -2664,7 +2708,7 @@ function calculateEarnings(effectiveness) {
     // - Experienced (some friends): ~200-400 gold/night  
     // - Expert (confidants + reputation): ~400-600+ gold/night
     //
-    // With retirement goals of 6,000-10,000 gold, this creates achievable progression
+            // With retirement goals of 2,000-4,000 gold, this creates very achievable progression
     
     const basePerformanceFee = 80; // Increased from 20
     let tips = Math.floor(Math.random() * 120 * (effectiveness / 100)); // 0-120 based on effectiveness
@@ -2705,16 +2749,16 @@ function calculateEarnings(effectiveness) {
             bonuses += Math.floor(Math.random() * 25) + 25; // 25-50 gold partial group bonus
         }
         
-        // Reputation bonus
+        // Reputation bonus (reordered to match new system)
         const reputationBonuses = {
             'Famous': 100,
-            'Well-Known': 60, 
-            'Respected': 40,
-            'Known': 20,
+            'Well-Known': 80, 
+            'Respected': 60,
+            'Known': 40,
             'Neutral': 0,
             'Disliked': -20,
-            'Hated': -40,
-            'Notorious': -60
+            'Hated': -50,
+            'Notorious': -80
         };
         
         const repBonus = reputationBonuses[gameState.reputation] || 0;
@@ -2820,16 +2864,17 @@ function generateConsequences(effectiveness) {
 }
 
 function updateReputation(effectiveness) {
-    const reputationLevels = ['Terrible', 'Poor', 'Neutral', 'Decent', 'Good', 'Great', 'Legendary'];
+    const reputationLevels = ['Notorious', 'Hated', 'Disliked', 'Neutral', 'Known', 'Respected', 'Well-Known', 'Famous'];
     let currentIndex = reputationLevels.indexOf(gameState.reputation);
+    if (currentIndex === -1) currentIndex = 3; // Default to Neutral if not found
     
     // Consider individual audience reactions for reputation changes
     if (gameState.audienceReactions && gameState.audienceReactions.length > 0) {
         let veryPositiveReactions = 0; // 80+ satisfaction
         let positiveReactions = 0; // 60-79 satisfaction
         let neutralReactions = 0; // 40-59 satisfaction  
-        let negativeReactions = 0; // 25-39 satisfaction
-        let veryNegativeReactions = 0; // <25 satisfaction
+        let negativeReactions = 0; // 20-39 satisfaction
+        let veryNegativeReactions = 0; // <20 satisfaction
         
         gameState.audienceReactions.forEach(reaction => {
             if (reaction.score >= 80) {
@@ -2838,7 +2883,7 @@ function updateReputation(effectiveness) {
                 positiveReactions++;
             } else if (reaction.score >= 40) {
                 neutralReactions++;
-            } else if (reaction.score >= 25) {
+            } else if (reaction.score >= 20) {
                 negativeReactions++;
             } else {
                 veryNegativeReactions++;
@@ -2847,27 +2892,37 @@ function updateReputation(effectiveness) {
         
         const totalAudience = gameState.audienceReactions.length;
         
-        // Simplified and more forgiving logic
-        const veryNegativePercent = veryNegativeReactions / totalAudience;
-        const negativePercent = (veryNegativeReactions + negativeReactions) / totalAudience;
-        const positivePercent = (veryPositiveReactions + positiveReactions) / totalAudience;
+        // Calculate percentages
         const veryPositivePercent = veryPositiveReactions / totalAudience;
+        const positivePercent = (veryPositiveReactions + positiveReactions) / totalAudience;
+        const negativePercent = (veryNegativeReactions + negativeReactions) / totalAudience;
+        const veryNegativePercent = veryNegativeReactions / totalAudience;
         
-        // Check for reputation changes (more forgiving thresholds)
-        if (veryNegativePercent >= 0.25) { // 25% very upset = reputation loss
-            currentIndex = Math.max(currentIndex - 1, 0);
-        } else if (negativePercent >= 0.6) { // 60% upset overall = reputation loss
-            currentIndex = Math.max(currentIndex - 1, 0);
-        } else if (veryPositivePercent >= 0.4) { // 40% very happy = reputation gain
+        // MUCH more forgiving reputation system - prioritizes positive reactions
+        // Reputation GAIN conditions (easier to gain reputation)
+        if (veryPositivePercent >= 0.5) { // 50%+ very happy = reputation gain
             currentIndex = Math.min(currentIndex + 1, reputationLevels.length - 1);
-        } else if (positivePercent >= 0.7) { // 70% happy overall = reputation gain
+        } else if (positivePercent >= 0.8) { // 80%+ happy overall = reputation gain  
+            currentIndex = Math.min(currentIndex + 1, reputationLevels.length - 1);
+        } else if (positivePercent >= 0.6 && veryNegativePercent === 0) { // 60%+ happy with no disasters = gain
             currentIndex = Math.min(currentIndex + 1, reputationLevels.length - 1);
         }
+        // Reputation LOSS conditions (much harder to lose reputation)
+        else if (veryNegativePercent >= 0.6) { // 60%+ very upset = reputation loss
+            currentIndex = Math.max(currentIndex - 1, 0);
+        } else if (negativePercent >= 0.8) { // 80%+ upset overall = reputation loss
+            currentIndex = Math.max(currentIndex - 1, 0);
+        } else if (veryNegativePercent >= 0.4 && positivePercent < 0.2) { // 40%+ disasters with little positivity = loss
+            currentIndex = Math.max(currentIndex - 1, 0);
+        }
+        // Neutral performances (most common) = no reputation change
+        
+        console.log(`Reputation update: ${positivePercent*100}% positive, ${negativePercent*100}% negative, ${veryNegativePercent*100}% very negative`);
     } else {
-        // Fallback to old system if no individual reactions
-        if (effectiveness >= 80) {
+        // Fallback to old system if no individual reactions (also more forgiving)
+        if (effectiveness >= 70) { // Raised threshold for gain
             currentIndex = Math.min(currentIndex + 1, reputationLevels.length - 1);
-        } else if (effectiveness < 30) {
+        } else if (effectiveness < 20) { // Lowered threshold for loss (much harsher performance needed)
             currentIndex = Math.max(currentIndex - 1, 0);
         }
     }
@@ -2876,7 +2931,7 @@ function updateReputation(effectiveness) {
 }
 
 function getReputationChangeDescription(oldReputation, newReputation) {
-    const reputationLevels = ['Terrible', 'Poor', 'Neutral', 'Decent', 'Good', 'Great', 'Legendary'];
+    const reputationLevels = ['Notorious', 'Hated', 'Disliked', 'Neutral', 'Known', 'Respected', 'Well-Known', 'Famous'];
     const oldIndex = reputationLevels.indexOf(oldReputation);
     const newIndex = reputationLevels.indexOf(newReputation);
     
@@ -3033,13 +3088,14 @@ function calculateItemCost(itemKey) {
     
     // Increase cost based on reputation - bad reputation = higher prices
     const reputationMultipliers = {
-        'Terrible': 1.5,
-        'Poor': 1.25,
+        'Notorious': 1.6,
+        'Hated': 1.4,
+        'Disliked': 1.2,
         'Neutral': 1.0,
-        'Decent': 0.95,
-        'Good': 0.9,
-        'Great': 0.85,
-        'Legendary': 0.8
+        'Known': 0.95,
+        'Respected': 0.9,
+        'Well-Known': 0.85,
+        'Famous': 0.8
     };
     
     cost = Math.floor(cost * (reputationMultipliers[gameState.reputation] || 1.0));
@@ -3085,8 +3141,8 @@ function purchaseItem(itemKey) {
 
 function checkForBanishment() {
     // Check if player should be chased out of town
-    const isBanished = (gameState.reputation === 'Terrible' && gameState.daysSinceLastMove >= 2) ||
-                      (gameState.reputation === 'Poor' && gameState.daysSinceLastMove >= 5);
+        const isBanished = (gameState.reputation === 'Notorious' && gameState.daysSinceLastMove >= 2) ||
+                       (gameState.reputation === 'Hated' && gameState.daysSinceLastMove >= 5);
     
     if (isBanished && !gameState.bannedFromTown) {
         gameState.bannedFromTown = true;
@@ -3102,22 +3158,22 @@ function showBanishmentScreen() {
     title.textContent = '🔥 Chased Out of Town!';
     
     let banishmentText = '';
-    if (gameState.reputation === 'Terrible') {
+    if (gameState.reputation === 'Notorious') {
         banishmentText = `
             <div style="color: #dc143c; font-weight: bold; text-align: center; font-size: 1.2em; margin-bottom: 20px;">
                 THE TOWNSFOLK HAVE HAD ENOUGH!
             </div>
-            <p style="margin-bottom: 15px;">Your terrible performances have made you the laughingstock of ${locations.townInfo?.name || 'town'}. 
+            <p style="margin-bottom: 15px;">Your notorious reputation has made you a pariah in ${locations.townInfo?.name || 'town'}. 
             Angry citizens are gathering in the streets, demanding you leave town immediately!</p>
             <p style="margin-bottom: 15px; color: #ffa500;">"That bard has brought nothing but shame to our community! 
             Get out and never come back!" shouts an angry mob.</p>
         `;
-    } else if (gameState.reputation === 'Poor') {
+    } else if (gameState.reputation === 'Hated') {
         banishmentText = `
             <div style="color: #dc143c; font-weight: bold; text-align: center; font-size: 1.2em; margin-bottom: 20px;">
                 WORN OUT YOUR WELCOME
             </div>
-            <p style="margin-bottom: 15px;">Your consistently poor performances have made the townspeople lose patience. 
+            <p style="margin-bottom: 15px;">Your hated reputation has made the townspeople lose patience. 
             The mayor has politely but firmly asked you to move on.</p>
             <p style="margin-bottom: 15px; color: #ffa500;">"Perhaps it's time you found a new audience, 
             bard. This town needs... different entertainment," says the mayor diplomatically.</p>
@@ -3445,7 +3501,7 @@ const travelEvents = [
                 requirements: { bodyguards: 1 },
                 outcomes: {
                     success: { text: 'Your bodyguards drive them away!', goldCost: 0, supplyCost: { bodyguards: 1 } },
-                    failure: { text: 'The fight goes badly!', goldCost: 0.4, supplyCost: { bodyguards: 1 } }
+                    failure: { text: 'The fight goes badly! You\'re wounded and robbed!', goldCost: 0.4, healthChange: -1, supplyCost: { bodyguards: 1 } }
                 },
                 successChance: 0.7
             },
@@ -3462,7 +3518,7 @@ const travelEvents = [
                 requirements: {},
                 outcomes: {
                     success: { text: 'You successfully avoid the bandits!', goldCost: 0, supplyCost: {} },
-                    failure: { text: 'They spot you and take everything!', goldCost: 0.5, supplyCost: {} }
+                    failure: { text: 'They spot you, beat you, and take everything!', goldCost: 0.5, healthChange: -1, supplyCost: {} }
                 },
                 successChance: 0.4
             }
@@ -3681,6 +3737,15 @@ function handleTravelEvent(choiceIndex) {
         resultText += ` Lost ${goldLoss} gold.`;
     }
     
+    // Check for death after health loss
+    if (gameState.health <= 0) {
+        gameState.gameOverReason = 'death';
+        setTimeout(() => {
+            showGameOverScreen();
+        }, 3000); // Give time to read the event result first
+        return;
+    }
+    
     // Supply costs
     if (outcome.supplyCost) {
         Object.keys(outcome.supplyCost).forEach(itemKey => {
@@ -3691,10 +3756,19 @@ function handleTravelEvent(choiceIndex) {
     
     // Health changes
     if (outcome.healthChange) {
-        const healthLevels = ['critical', 'poor', 'fair', 'good', 'excellent'];
-        let currentHealthIndex = healthLevels.indexOf(gameState.travelState.health);
-        currentHealthIndex = Math.max(0, Math.min(4, currentHealthIndex + outcome.healthChange));
-        gameState.travelState.health = healthLevels[currentHealthIndex];
+        const healthDamage = Math.abs(outcome.healthChange) * 15; // Convert health levels to points (15 points per level)
+        if (outcome.healthChange > 0) {
+            // Healing
+            gameState.health = Math.min(100, gameState.health + healthDamage);
+            resultText += ` Health restored by ${healthDamage} points.`;
+        } else {
+            // Damage
+            gameState.health = Math.max(0, gameState.health - healthDamage);
+            resultText += ` Lost ${healthDamage} health!`;
+            if (gameState.health <= 20) {
+                resultText += ` <span style="color: #dc143c;">⚠️ Health critically low!</span>`;
+            }
+        }
     }
     
     // Days delay
@@ -3775,10 +3849,9 @@ function nextDay() {
     // Deduct inn cost
     gameState.gold -= gameState.innCostPerNight;
     
-    // Check for bankruptcy
-    if (gameState.gold < 0) {
-        showGameOverScreen();
-        return;
+    // Check all lose conditions
+    if (checkLoseConditions()) {
+        return; // Game over screen already shown
     }
     
     gameState.day++;
@@ -3829,14 +3902,132 @@ function showWinScreen() {
     `;
 }
 
+function checkLoseConditions() {
+    // 1. DEATH - Health reaches 0
+    if (gameState.health <= 0) {
+        gameState.gameOverReason = 'death';
+        showGameOverScreen();
+        return true;
+    }
+    
+    // 2. BANKRUPTCY - No gold and can't afford inn for multiple days
+    if (gameState.gold < gameState.innCostPerNight * 2) {
+        // Give player a chance if they just ran out
+        if (gameState.gold < 0 || (gameState.gold < gameState.innCostPerNight && gameState.warningsGiven >= 2)) {
+            gameState.gameOverReason = 'bankruptcy';
+            showGameOverScreen();
+            return true;
+        } else if (gameState.gold < gameState.innCostPerNight) {
+            gameState.warningsGiven++;
+        }
+    }
+    
+    // 3. EXILE - Reputation too damaged to perform
+    const exileReputations = ['Notorious', 'Hated'];
+    if (exileReputations.includes(gameState.reputation) && gameState.consecutiveBadPerformances >= 3) {
+        gameState.gameOverReason = 'exile';
+        showGameOverScreen();
+        return true;
+    }
+    
+    // 4. EXILE - Too many consecutive bad performances (kicked out of town)
+    if (gameState.consecutiveBadPerformances >= 5) {
+        gameState.gameOverReason = 'exile_performance';
+        showGameOverScreen();
+        return true;
+    }
+    
+    return false;
+}
+
+function trackPerformanceQuality(effectiveness) {
+    // Track consecutive bad performances for exile condition
+    if (effectiveness < 40) {
+        gameState.consecutiveBadPerformances++;
+        console.log(`Bad performance! Consecutive: ${gameState.consecutiveBadPerformances}`);
+    } else if (effectiveness >= 60) {
+        // Good performance resets the counter
+        gameState.consecutiveBadPerformances = 0;
+    }
+    // Mediocre performances (40-59) don't reset but don't add either
+}
+
+function checkLoseConditionWarnings(consequences) {
+    // Health warnings
+    if (gameState.health <= 30 && gameState.health > 0) {
+        consequences.push(`⚠️ <span style="color: #dc143c;">Your health is dangerously low! Seek medicine or rest before traveling.</span>`);
+    }
+    
+    // Bankruptcy warnings  
+    if (gameState.gold < gameState.innCostPerNight * 3 && gameState.gold >= gameState.innCostPerNight) {
+        consequences.push(`💸 <span style="color: #ffa500;">Warning: You're running low on gold! Only ${Math.floor(gameState.gold / gameState.innCostPerNight)} nights of lodging remaining.</span>`);
+    }
+    
+    // Performance warnings
+    if (gameState.consecutiveBadPerformances >= 3) {
+        consequences.push(`👎 <span style="color: #dc143c;">Danger! ${gameState.consecutiveBadPerformances} consecutive bad performances. Towns may start banning you!</span>`);
+    } else if (gameState.consecutiveBadPerformances >= 2) {
+        consequences.push(`⚠️ <span style="color: #ffa500;">Caution: ${gameState.consecutiveBadPerformances} bad performances in a row. Improve your storytelling!</span>`);
+    }
+    
+    // Reputation warnings
+    const dangerousReps = ['Disliked', 'Hated', 'Notorious'];
+    if (dangerousReps.includes(gameState.reputation)) {
+        consequences.push(`😠 <span style="color: #dc143c;">Your poor reputation is making life difficult. A few more bad performances could mean exile!</span>`);
+    }
+}
+
 function showGameOverScreen() {
+    const gameOverContent = {
+        'death': {
+            icon: '💀',
+            title: 'Death on the Road',
+            message: 'Your health has failed you during your dangerous travels as a bard.',
+            quote: '"Even the greatest stories must come to an end..."',
+            color: '#8b0000'
+        },
+        'bankruptcy': {
+            icon: '💸',
+            title: 'Broke and Homeless', 
+            message: 'You\'ve run out of gold and can no longer afford lodging or travel.',
+            quote: '"A bard without coin is just a wanderer with stories..."',
+            color: '#dc143c'
+        },
+        'exile': {
+            icon: '🚪',
+            title: 'Exiled from Society',
+            message: 'Your terrible reputation has made you unwelcome in all civilized places.',
+            quote: '"When no one will listen, a bard\'s voice falls silent..."',
+            color: '#4b0082'
+        },
+        'exile_performance': {
+            icon: '👎',
+            title: 'Driven Out by Angry Crowds',
+            message: 'Too many awful performances have turned every town against you.',
+            quote: '"The audience has spoken, and they want you gone..."',
+            color: '#b22222'
+        }
+    };
+    
+    const reason = gameState.gameOverReason || 'bankruptcy';
+    const content = gameOverContent[reason];
+    
     document.querySelector('.game-main').innerHTML = `
         <div class="text-center">
-            <h2 style="color: #dc143c; font-size: 2.5em; margin-bottom: 20px;">💸 Game Over 💸</h2>
-            <p style="font-size: 1.2em; margin-bottom: 20px;">You've run out of gold and can no longer afford lodging!</p>
-            <p style="margin-bottom: 20px;">You survived <strong>${gameState.day} days</strong> as a traveling bard.</p>
-            <p style="margin-bottom: 20px;">Your final reputation: <strong>${gameState.reputation}</strong></p>
-            <p style="margin-bottom: 30px; font-style: italic;">"A bard without coin is just a wanderer with stories..."</p>
+            <h2 style="color: ${content.color}; font-size: 2.5em; margin-bottom: 20px;">${content.icon} ${content.title} ${content.icon}</h2>
+            <p style="font-size: 1.2em; margin-bottom: 20px;">${content.message}</p>
+            <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px; margin: 20px 0;">
+                <p style="margin-bottom: 15px;">📊 <strong>Final Statistics:</strong></p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left;">
+                    <div>Days survived: <strong>${gameState.day}</strong></div>
+                    <div>Towns visited: <strong>${gameState.townNumber}</strong></div>
+                    <div>Final gold: <strong>${Math.max(0, gameState.gold)}</strong></div>
+                    <div>Health: <strong>${gameState.health}</strong></div>
+                    <div>Reputation: <strong>${gameState.reputation}</strong></div>
+                    <div>Retirement goal: <strong>${gameState.retirementGoal}</strong></div>
+                </div>
+            </div>
+            <p style="margin-bottom: 30px; font-style: italic; color: ${content.color};">${content.quote}</p>
             <button onclick="resetGame()" style="font-size: 1.2em; padding: 15px 30px;">🎭 Try Again</button>
         </div>
     `;
@@ -3905,7 +4096,24 @@ function resetGame() {
         consequences: [],
         townHistory: [],
         eveningAudience: [],
-        audienceReactions: []
+        audienceReactions: [],
+        // Inventory and travel system
+        inventory: {
+            provisions: 0,
+            bodyguards: 0,
+            medicine: 0,
+            wagons: 0,
+            horses: 0
+        },
+        townNumber: 1,
+        daysSinceLastMove: 0,
+        bannedFromTown: false,
+        travelDanger: 50,
+        // Lose condition tracking
+        health: 100,
+        consecutiveBadPerformances: 0,
+        gameOverReason: null,
+        warningsGiven: 0
     };
     
     // Generate new random characters for the fresh game

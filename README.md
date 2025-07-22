@@ -5,7 +5,7 @@ A playable web implementation of the Bard Game concept, where you play as a trav
 ## How to Play
 
 1. **Open the game**: Simply open `index.html` in your web browser
-2. **Objective**: Earn 10,000 gold to retire in comfort!
+2. **Objective**: Earn 2,000-4,000 gold (randomly determined) to retire in comfort!
 
 ## Gameplay Flow
 
