@@ -10,13 +10,18 @@
     <div class="game-container">
         <header class="game-header">
             <h1>🎭 The Bard Game</h1>
-            <div class="player-stats">
-                <span class="gold">💰 Gold: <span id="gold">500</span></span>
-                <span class="reputation">⭐ Reputation: <span id="reputation">Neutral</span></span>
-                <span class="day-counter">📅 Day: <span id="day">1</span></span>
-                <span class="town-counter">🏘️ Town: <span id="town-number">1</span></span>
-                <span class="conversations">💬 Conversations: <span id="conversations">4/4</span></span>
-                <span class="inventory-summary">📦 Supplies: <span id="supplies-count">0</span></span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="player-stats">
+                    <span class="gold">💰 Gold: <span id="gold">500</span></span>
+                    <span class="reputation">⭐ Reputation: <span id="reputation">Neutral</span></span>
+                    <span class="day-counter">📅 Day: <span id="day">1</span></span>
+                    <span class="town-counter">🏘️ Town: <span id="town-number">1</span></span>
+                    <span class="conversations">💬 Conversations: <span id="conversations">4/4</span></span>
+                    <span class="inventory-summary">📦 Supplies: <span id="supplies-count">0</span></span>
+                </div>
+                <button onclick="showInstructions()" style="padding: 8px 16px; font-size: 0.9em; background: linear-gradient(45deg, #654321 0%, #8b4513 100%);">
+                    ❓ How to Play
+                </button>
             </div>
         </header>
 
@@ -111,11 +116,82 @@
                     <div id="location-content"></div>
                 </div>
             </div>
+
+            <!-- Welcome Screen -->
+            <div id="welcome-modal" class="modal">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h1 style="color: #daa520; font-size: 2.5em; margin-bottom: 10px;">🎭 Welcome to The Bard Game!</h1>
+                        <p style="font-size: 1.2em; color: #f4e4c1; font-style: italic;">A tale of storytelling, reputation, and survival on the frontier</p>
+                    </div>
+                    
+                    <div style="background: rgba(139, 69, 19, 0.2); border-radius: 8px; padding: 20px; margin: 20px 0;">
+                        <h3 style="color: #daa520; margin-bottom: 15px;">📜 Your Story Begins...</h3>
+                        <p style="margin-bottom: 15px;">You are a traveling bard seeking to earn <strong><span id="welcome-retirement-goal">10,000</span> gold</strong> for a comfortable retirement. Armed only with your wit and a collection of stories, you must:</p>
+                        <ul style="margin: 15px 0; padding-left: 20px;">
+                            <li style="margin: 8px 0;">🗣️ <strong>Talk to townspeople</strong> to gather information for your stories</li>
+                            <li style="margin: 8px 0;">🎭 <strong>Craft compelling tales</strong> from confirmed facts, mysterious rumors, or pure imagination</li>
+                            <li style="margin: 8px 0;">⭐ <strong>Build your reputation</strong> by matching your audience's preferences</li>
+                            <li style="margin: 8px 0;">💰 <strong>Earn gold</strong> from satisfied patrons</li>
+                            <li style="margin: 8px 0;">🛒 <strong>Buy supplies</strong> to survive dangerous journeys between towns</li>
+                        </ul>
+                        <p style="color: #ffa500; font-weight: bold;">⚠️ Beware: Poor performances will upset patrons and can get you chased out of town!</p>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 25px;">
+                        <button onclick="startGame()" style="padding: 15px 30px; font-size: 1.2em; margin-right: 15px;">
+                            🎵 Start Your Journey
+                        </button>
+                        <button onclick="showInstructions()" style="padding: 15px 30px; font-size: 1.2em;">
+                            📋 Read Full Instructions
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instructions Modal -->
+            <div id="instructions-modal" class="modal hidden">
+                <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+                    <span class="close" onclick="closeInstructions()">&times;</span>
+                    <h2 style="color: #daa520; text-align: center; margin-bottom: 20px;">📋 How to Play The Bard Game</h2>
+                    
+                    <div id="instructions-content">
+                        <!-- Instructions will be loaded here -->
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="closeInstructions()" style="padding: 12px 24px; font-size: 1.1em;">
+                            🎭 Start Playing
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conversation Results Modal -->
+            <div id="conversation-modal" class="modal hidden">
+                <div class="modal-content" style="max-width: 600px;">
+                    <span class="close" onclick="closeConversationModal()">&times;</span>
+                    <h2 style="color: #daa520; text-align: center; margin-bottom: 20px;">💬 Conversation Results</h2>
+                    
+                    <div id="conversation-results">
+                        <!-- Conversation results will be loaded here -->
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 25px;">
+                        <button onclick="closeConversationModal()" style="padding: 12px 20px; font-size: 1.0em; margin-right: 10px;">
+                            👍 Continue Exploring
+                        </button>
+                        <button onclick="closeAllModalsAndStartEvening()" style="padding: 12px 20px; font-size: 1.0em;" id="conversation-evening-btn" disabled>
+                            🌙 Ready for Evening
+                        </button>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <footer class="game-footer">
             <div class="objective">
-                <strong>Objective:</strong> Earn 10,000 gold to retire in comfort! • <strong>Daily Cost:</strong> 5 gold per night
+                <strong>Objective:</strong> Earn <span id="footer-retirement-goal">10,000</span> gold to retire in comfort! • <strong>Daily Cost:</strong> <span id="inn-cost">5</span> gold per night
             </div>
         </footer>
     </div>
