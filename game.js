@@ -329,6 +329,49 @@ function generateTownDescription(townInfo) {
     return baseDescriptions[townInfo.type] || `${townInfo.name} is a unique settlement with its own character and challenges.`;
 }
 
+function generateInnPrice(townInfo) {
+    // Base price influenced by town type and atmosphere
+    const basePrices = {
+        'mining': 4,      // Working class town - cheaper
+        'farming': 3,     // Rural town - cheapest  
+        'trading': 6,     // Commercial hub - more expensive
+        'coastal': 5      // Port town - moderate
+    };
+    
+    const basePrice = basePrices[townInfo.type] || 4;
+    
+    // Atmosphere modifier
+    const atmosphereModifiers = {
+        'bustling': 1.5,      // Popular places cost more
+        'prosperous': 1.3,    
+        'thriving': 1.4,
+        'busy': 1.2,
+        'struggling': 0.8,    // Hard times = cheaper
+        'quiet': 0.9,
+        'decline': 0.7,
+        'abandoned': 0.6
+    };
+    
+    let modifier = 1.0;
+    // Check if atmosphere contains any of these key words
+    const atmosphereLower = townInfo.atmosphere.toLowerCase();
+    for (const [keyword, mod] of Object.entries(atmosphereModifiers)) {
+        if (atmosphereLower.includes(keyword)) {
+            modifier = mod;
+            break;
+        }
+    }
+    
+    // Add some randomness (±1-2 gold)
+    const randomVariation = Math.floor(Math.random() * 4) - 2; // -2 to +1
+    
+    // Calculate final price and ensure it's reasonable (2-10 gold)
+    let finalPrice = Math.round(basePrice * modifier) + randomVariation;
+    finalPrice = Math.max(2, Math.min(10, finalPrice));
+    
+    return finalPrice;
+}
+
 function generateCharacterName() {
     const gender = Math.random() < 0.5 ? 'male' : 'female';
     const firstName = randomChoice(characterGen.firstNames[gender]);
@@ -624,6 +667,9 @@ function generateLocations() {
     // Store town info for use elsewhere
     locationData.townInfo = townInfo;
     
+    // Generate inn price for this town
+    gameState.innCostPerNight = generateInnPrice(townInfo);
+    
     return locationData;
 }
 
@@ -715,6 +761,9 @@ const storyTemplates = {
 
 // Initialize Game
 function initGame() {
+    // Generate retirement goal first so welcome screen shows correct amount
+    generateRetirementGoal();
+    
     // Generate random characters for this playthrough
     locations = generateLocations();
     
@@ -725,12 +774,33 @@ function initGame() {
     }
     
     updateUI();
-    generateRetirementGoal();
+    
+    // Show welcome screen on first load
+    showWelcomeScreen();
 }
 
 function generateRetirementGoal() {
-    gameState.retirementGoal = Math.floor(Math.random() * 7000) + 8000;
-    document.querySelector('.objective').innerHTML = `<strong>Objective:</strong> Earn ${gameState.retirementGoal} gold to retire in comfort!`;
+    // Adjusted for rebalanced economy - target 12-20 successful performances
+    // With new income levels (200-500+ per night), this is achievable
+    gameState.retirementGoal = Math.floor(Math.random() * 4000) + 6000; // 6,000-10,000 gold
+    
+    // Update all retirement goal displays
+    const footerGoalElement = document.getElementById('footer-retirement-goal');
+    if (footerGoalElement) {
+        footerGoalElement.textContent = gameState.retirementGoal.toLocaleString();
+    }
+    
+    const welcomeGoalElement = document.getElementById('welcome-retirement-goal');
+    if (welcomeGoalElement) {
+        welcomeGoalElement.textContent = gameState.retirementGoal.toLocaleString();
+    }
+}
+
+function updateInnCostDisplay() {
+    const innCostElement = document.getElementById('inn-cost');
+    if (innCostElement) {
+        innCostElement.textContent = gameState.innCostPerNight;
+    }
 }
 
 function updateUI() {
@@ -742,6 +812,9 @@ function updateUI() {
     // Update supplies count
     const totalSupplies = Object.values(gameState.inventory).reduce((sum, qty) => sum + qty, 0);
     document.getElementById('supplies-count').textContent = totalSupplies;
+    
+    // Update inn cost display
+    updateInnCostDisplay();
     
     // Check for being chased out of town
     checkForBanishment();
@@ -1027,22 +1100,108 @@ function talkToNPC(locationKey, npcIndex) {
     // Refresh the modal content to show updated conversation counts and NPC availability
     refreshLocationModal(locationKey);
     
-    // Show expanded feedback with character details
-    const content = document.getElementById('location-content');
+    // Show conversation results in popup modal
+    showConversationResults(npc, character);
+}
+
+function showConversationResults(npc, character) {
+    const modal = document.getElementById('conversation-modal');
+    const results = document.getElementById('conversation-results');
+    
     const relationshipText = character.relationshipLevel === 'acquaintance' ? 
         'You are getting to know them' : 
         character.relationshipLevel === 'friend' ? 
             'They seem to trust you more' : 'They consider you a close confidant';
     
-    content.innerHTML += `
-        <div style="margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.3); border-radius: 8px; border-left: 4px solid #32cd32;">
-            <strong>Character Knowledge Gained:</strong><br>
-            <strong>${npc.name}</strong> - ${npc.character.profession}<br>
-            <em>Personality:</em> ${npc.character.personality}<br>
-            <em>Information:</em> ${npc.info.text} (${npc.info.type.toUpperCase()})<br>
-            <em>Relationship:</em> ${relationshipText} (${character.conversationsHad} conversations)<br>
+    // Determine relationship improvement message
+    let relationshipChange = '';
+    if (character.conversationsHad === 3 && character.relationshipLevel === 'friend') {
+        relationshipChange = '<div style="color: #32cd32; font-weight: bold; margin-top: 10px;">🎉 You\'ve become friends!</div>';
+    } else if (character.conversationsHad === 5 && character.relationshipLevel === 'confidant') {
+        relationshipChange = '<div style="color: #daa520; font-weight: bold; margin-top: 10px;">⭐ They now consider you a close confidant!</div>';
+    }
+    
+    // Get information quality indicator
+    const infoQualityColor = {
+        'confirmed': '#32cd32',
+        'rumored': '#ffa500', 
+        'madeUp': '#dc143c'
+    };
+    
+    const infoQualityText = {
+        'confirmed': 'VERIFIED FACT',
+        'rumored': 'UNCONFIRMED RUMOR',
+        'madeUp': 'PURE FICTION'
+    };
+    
+    const conversationsRemaining = gameState.maxConversationsPerDay - gameState.conversationsUsed;
+    
+    results.innerHTML = `
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="background: rgba(139, 69, 19, 0.3); border-radius: 10px; padding: 20px; margin-bottom: 15px;">
+                <h3 style="color: #daa520; margin-bottom: 15px;">📖 You spoke with ${npc.name}</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="text-align: left;">
+                        <strong>Profession:</strong> ${npc.character.profession}<br>
+                        <strong>Personality:</strong> ${npc.character.personality}
+                    </div>
+                    <div style="text-align: right; color: #daa520;">
+                        <strong>Relationship:</strong><br>
+                        ${character.relationshipLevel} (${character.conversationsHad} conversations)
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    ${relationshipText}
+                    ${relationshipChange}
+                </div>
+            </div>
+            
+            <div style="background: rgba(34, 139, 34, 0.2); border-radius: 10px; padding: 20px; border-left: 4px solid ${infoQualityColor[npc.info.type]};">
+                <h4 style="color: #daa520; margin-bottom: 10px;">📰 Information Gained:</h4>
+                <div style="font-size: 1.1em; margin-bottom: 10px; font-style: italic;">
+                    "${npc.info.text}"
+                </div>
+                <div style="color: ${infoQualityColor[npc.info.type]}; font-weight: bold;">
+                    Quality: ${infoQualityText[npc.info.type]}
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 10px; background: rgba(255, 165, 0, 0.1); border-radius: 5px;">
+                💬 <strong>Conversations remaining today:</strong> ${conversationsRemaining}/${gameState.maxConversationsPerDay}
+            </div>
         </div>
     `;
+    
+    // Update the evening button state in the modal
+    const eveningBtn = document.getElementById('conversation-evening-btn');
+    const hasEnoughInfo = gameState.gatheredInfo.length >= 3;
+    const noConversationsLeft = gameState.conversationsUsed >= gameState.maxConversationsPerDay;
+    
+    eveningBtn.disabled = !(hasEnoughInfo || noConversationsLeft);
+    
+    if (hasEnoughInfo) {
+        eveningBtn.innerHTML = '🌙 Ready for Evening';
+        eveningBtn.style.background = 'linear-gradient(45deg, #4a4a4a 0%, #654321 100%)';
+    } else if (noConversationsLeft) {
+        eveningBtn.innerHTML = '🌙 No More Conversations - Start Evening';
+        eveningBtn.style.background = 'linear-gradient(45deg, #4a4a4a 0%, #654321 100%)';
+    } else {
+        const needed = 3 - gameState.gatheredInfo.length;
+        eveningBtn.innerHTML = `🌙 Need ${needed} more conversation${needed > 1 ? 's' : ''}`;
+        eveningBtn.style.background = '#666';
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeConversationModal() {
+    document.getElementById('conversation-modal').classList.add('hidden');
+}
+
+function closeAllModalsAndStartEvening() {
+    document.getElementById('conversation-modal').classList.add('hidden');
+    document.getElementById('location-modal').classList.add('hidden');
+    startEvening();
 }
 
 function closeModal() {
@@ -1154,20 +1313,31 @@ function displayAudience() {
         const memberDiv = document.createElement('div');
         memberDiv.className = 'audience-member';
         
-        const preferences = audienceMember.character.storyPreferences;
-        const preferenceText = preferences ? 
-            `Prefers: ${preferences.truthLevel} stories, ${preferences.tone} tone` : 
-            'Unknown preferences';
+        // Only show preferences for characters the player knows
+        let preferenceText;
+        if (audienceMember.relationshipLevel === 'stranger') {
+            preferenceText = '<span style="color: #999; font-style: italic;">Story preferences unknown</span>';
+        } else {
+            const preferences = audienceMember.character.storyPreferences;
+            preferenceText = preferences ? 
+                `<span style="color: #daa520;">Prefers: ${preferences.truthLevel} stories, ${preferences.tone} tone</span>` : 
+                'Unknown preferences';
+        }
+        
+        // Show less detail for strangers
+        const personalityDisplay = audienceMember.relationshipLevel === 'stranger' ? 
+            'Unknown personality' : audienceMember.character.personality;
             
         memberDiv.innerHTML = `
             <div class="audience-member-info">
                 <strong>${audienceMember.name}</strong> (${audienceMember.mood})
                 <div class="audience-member-details">
-                    ${audienceMember.character.profession} - ${audienceMember.character.personality}
+                    ${audienceMember.character.profession} - ${personalityDisplay}
                 </div>
                 <div class="audience-preferences">${preferenceText}</div>
                 ${audienceMember.relationshipLevel !== 'stranger' ? 
-                    `<div class="relationship">Relationship: ${audienceMember.relationshipLevel}</div>` : ''}
+                    `<div class="relationship">Relationship: ${audienceMember.relationshipLevel}</div>` : 
+                    `<div class="relationship" style="color: #999; font-style: italic;">A stranger to you</div>`}
             </div>
         `;
         
@@ -1700,35 +1870,35 @@ function generateAct2Text(act1Choice, act2Theme, type, characters) {
         // If Act 1 was about industrial problems...
         industrial: {
             adventure: {
-                confirmed: `Motivated by the ${act1Choice.theme} troubles you described, ${protName} decides to take action and venture forth to find a real solution...`,
-                rumored: `Following mysterious clues from your ${act1Choice.theme} tale, ${protName} begins investigating the rumors ${supportName} whispered about...`,
-                madeUp: `Empowered by the magical elements of your ${act1Choice.theme} story, ${protName} discovers they have special abilities to confront these challenges...`
+                confirmed: `Seeing the industrial troubles plaguing the community, ${protName} decides to take action and venture forth to find a real solution...`,
+                rumored: `Following mysterious clues and strange whispers, ${protName} begins investigating the rumors ${supportName} had spoken about...`,
+                madeUp: `Awakening to newfound magical abilities, ${protName} discovers they have special powers to confront these otherworldly challenges...`
             },
             discovery: {
-                confirmed: `Through careful investigation of the ${act1Choice.theme} situation, ${protName} and ${supportName} work together to uncover the truth...`,
-                rumored: `Following leads from your ${act1Choice.theme} tale, ${protName} makes a discovery that could change everything about the situation...`,
-                madeUp: `Using mystical insights from your ${act1Choice.theme} story, ${protName} unveils hidden secrets in spectacular fashion...`
+                confirmed: `Through careful investigation of the industrial situation, ${protName} and ${supportName} work together to uncover the truth...`,
+                rumored: `Following cryptic leads and shadowy hints, ${protName} makes a discovery that could change everything about the situation...`,
+                madeUp: `Using mystical insights and arcane knowledge, ${protName} unveils hidden secrets in spectacular fashion...`
             },
             conflict: {
-                confirmed: `The ${act1Choice.theme} problems you described lead to ${protName} facing real opposition from ${antName} and the established order...`,
-                rumored: `Dark forces connected to the ${act1Choice.theme} mysteries seem to conspire against ${protName} who seeks the truth...`,
-                madeUp: `Epic battles emerge as ${protName} fights the dark powers that ${antName} has unleashed from the ${act1Choice.theme} situation...`
+                confirmed: `The industrial problems inevitably lead to ${protName} facing real opposition from ${antName} and the established order...`,
+                rumored: `Dark forces connected to the industrial mysteries seem to conspire against ${protName} who seeks the truth...`,
+                madeUp: `Epic battles emerge as ${protName} fights the dark powers that ${antName} has unleashed from the cursed industrial sites...`
             }
         },
         // If Act 1 was about market/economic issues...
         market: {
             adventure: {
-                confirmed: `Inspired by the economic struggles you portrayed, ${protName} ventures out to find new opportunities for ${townInfo.name}...`,
-                rumored: `Driven by whispers from your market tale, ${protName} follows ${supportName}'s leads about hidden opportunities...`,
-                madeUp: `Blessed with merchant magic from your tale, ${protName} sets forth to discover legendary trading routes...`
+                confirmed: `Inspired by the economic struggles facing the community, ${protName} ventures out to find new opportunities for ${townInfo.name}...`,
+                rumored: `Driven by whispers and strange tales from the marketplace, ${protName} follows ${supportName}'s leads about hidden opportunities...`,
+                madeUp: `Blessed with mystical merchant powers, ${protName} sets forth to discover legendary trading routes of old...`
             },
             discovery: {
                 confirmed: `Through careful business investigation, ${protName} and ${supportName} work to uncover what's really affecting trade...`,
-                rumored: `Following market rumors from your story, ${protName} discovers something that could transform commerce...`,
-                madeUp: `With mystical business insight, ${protName} reveals ancient secrets of prosperity...`
+                rumored: `Following cryptic market rumors and coded messages, ${protName} discovers something that could transform commerce...`,
+                madeUp: `With supernatural business insight, ${protName} reveals ancient secrets of prosperity hidden in the stars...`
             },
             conflict: {
-                confirmed: `The market problems you described lead ${protName} to confront ${antName} who may be manipulating trade...`,
+                confirmed: `The market problems inevitably lead ${protName} to confront ${antName} who may be manipulating trade...`,
                 rumored: `Economic conspiracies seem to pit ${antName} against ${protName} in a battle for ${townInfo.name}'s future...`,
                 madeUp: `${protName} must battle the greed-demons that ${antName} has summoned to destroy commerce...`
             }
@@ -1736,17 +1906,17 @@ function generateAct2Text(act1Choice, act2Theme, type, characters) {
         // If Act 1 was about tavern/social issues...
         tavern: {
             adventure: {
-                confirmed: `Motivated by the social tensions you described, ${protName} decides to bring people together...`,
-                rumored: `Following the social whispers from your tavern tale, ${protName} investigates with help from ${supportName}...`,
-                madeUp: `Empowered by social magic, ${protName} sets out to heal the community's bonds...`
+                confirmed: `Motivated by the social tensions dividing the community, ${protName} decides to bring people together...`,
+                rumored: `Following mysterious social whispers and tavern gossip, ${protName} investigates with help from ${supportName}...`,
+                madeUp: `Empowered by ancient social magic, ${protName} sets out to heal the community's fractured bonds...`
             },
             discovery: {
                 confirmed: `Through community investigation, ${protName} and ${supportName} work to understand what's dividing people...`,
-                rumored: `Following social rumors, ${protName} discovers secrets that could unite or divide ${townInfo.name}...`,
-                madeUp: `With mystical empathy, ${protName} unveils the hidden emotional currents of the community...`
+                rumored: `Following cryptic social rumors and veiled threats, ${protName} discovers secrets that could unite or divide ${townInfo.name}...`,
+                madeUp: `With mystical empathy and supernatural insight, ${protName} unveils the hidden emotional currents of the community...`
             },
             conflict: {
-                confirmed: `The social problems lead ${protName} to confront ${antName} who may be sowing discord...`,
+                confirmed: `The social problems inevitably lead ${protName} to confront ${antName} who may be sowing discord...`,
                 rumored: `Social conspiracies emerge as ${antName} works against ${protName}'s efforts to unite people...`,
                 madeUp: `${protName} battles the chaos-spirits that ${antName} has unleashed to divide the community...`
             }
@@ -1754,17 +1924,17 @@ function generateAct2Text(act1Choice, act2Theme, type, characters) {
         // If Act 1 was about government/political issues...
         government: {
             adventure: {
-                confirmed: `Motivated by the political problems you described, ${protName} decides to work for real change in ${townInfo.name}...`,
-                rumored: `Following political whispers from your tale, ${protName} investigates corruption with ${supportName}'s help...`,
-                madeUp: `Empowered by civic magic, ${protName} sets forth to bring justice to the realm...`
+                confirmed: `Motivated by the political corruption plaguing the town, ${protName} decides to work for real change in ${townInfo.name}...`,
+                rumored: `Following shadowy political whispers and coded messages, ${protName} investigates corruption with ${supportName}'s help...`,
+                madeUp: `Empowered by divine civic magic, ${protName} sets forth to bring justice to the realm...`
             },
             discovery: {
                 confirmed: `Through careful political investigation, ${protName} and ${supportName} work to expose the truth about leadership...`,
-                rumored: `Following government rumors, ${protName} discovers secrets that could transform how ${townInfo.name} is governed...`,
-                madeUp: `With mystical insight, ${protName} reveals the hidden political forces at work...`
+                rumored: `Following mysterious government rumors and secret meetings, ${protName} discovers secrets that could transform how ${townInfo.name} is governed...`,
+                madeUp: `With mystical insight and otherworldly wisdom, ${protName} reveals the hidden political forces at work...`
             },
             conflict: {
-                confirmed: `The political problems lead ${protName} to directly challenge ${antName}'s authority and methods...`,
+                confirmed: `The political corruption inevitably leads ${protName} to directly challenge ${antName}'s authority and methods...`,
                 rumored: `Political conspiracies pit the corrupt ${antName} against the reformist ${protName}...`,
                 madeUp: `${protName} wages epic battle against the tyranny-demons commanded by ${antName}...`
             }
@@ -1813,6 +1983,43 @@ function generateAct3Choices() {
     });
 }
 
+// Helper function to get specific problem descriptions for better Act 3 cohesion
+function getSpecificProblem(act1Theme) {
+    const problemDescriptions = {
+        'industrial': 'mine collapse and sealed tunnels',
+        'market': 'broken trade routes and empty stalls',
+        'tavern': 'social tensions and divided community',
+        'government': 'corruption and broken trust in leadership'
+    };
+    return problemDescriptions[act1Theme] || 'difficult challenges';
+}
+
+// Helper function to get specific solutions based on Act 2 approach
+function getSpecificSolution(act2Theme, act1Theme) {
+    const solutions = {
+        'adventure': {
+            'industrial': 'new trade contacts and skilled engineers',
+            'market': 'alternative supply chains and merchant alliances', 
+            'tavern': 'shared experiences that unite people',
+            'government': 'evidence of better governance from other towns'
+        },
+        'discovery': {
+            'industrial': 'the real cause of the original disaster',
+            'market': 'hidden sabotage disrupting commerce',
+            'tavern': 'the source of the community\'s divisions',
+            'government': 'proof of corruption and a path to reform'
+        },
+        'conflict': {
+            'industrial': 'confronting those who profit from the town\'s decline',
+            'market': 'challenging unfair trade practices',
+            'tavern': 'standing up to those spreading discord',
+            'government': 'directly opposing corrupt officials'
+        }
+    };
+    return solutions[act2Theme] && solutions[act2Theme][act1Theme] ? 
+           solutions[act2Theme][act1Theme] : 'determined action';
+}
+
 function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
     const { protagonist, supportingChar, antagonist, townInfo } = characters;
     const protName = protagonist ? protagonist.name : 'a brave soul';
@@ -1823,59 +2030,76 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
     const storyProgression = `${act1Choice.theme}-${act2Choice.theme}`;
     
     const contextualTemplates = {
-        // Various story progression paths
+        // Various story progression paths - Enhanced for better cohesion
         'industrial-adventure': {
             triumph: {
-                confirmed: `Through brave action, ${protName} successfully addresses the ${act1Choice.theme} problems and ${townInfo.name} begins to prosper again...`,
-                rumored: `${protName}'s bold journey leads to mysterious solutions, though ${supportName} wonders if the changes will last...`,
-                madeUp: `With magical triumph, ${protName} transforms the ${act1Choice.theme} ruins into a wonderland, saving ${townInfo.name}...`
+                confirmed: `${protName}'s bold venture beyond ${townInfo.name} pays off - they return with new trade partners, skilled workers, and fresh hope. The ${getSpecificProblem(act1Choice.theme)} that once seemed insurmountable now has real solutions, and ${supportName} helps organize the community's renewal...`,
+                rumored: `${protName} returns from their mysterious journey changed, bringing whispered tales of distant places and hidden opportunities. While ${supportName} can't quite understand what ${protName} discovered, the industrial heart of ${townInfo.name} slowly stirs back to life in unexpected ways...`,
+                madeUp: `${protName} emerges from their mystical quest wielding powers that restore the ${act1Choice.theme} sites to their former glory and beyond. With ${supportName} as their trusted ally, they reshape ${townInfo.name} into a wonderland where magic and industry work as one...`
             },
             tragedy: {
-                confirmed: `Despite ${protName}'s courageous efforts, the harsh realities of the ${act1Choice.theme} situation prove too difficult to overcome...`,
-                rumored: `${protName}'s adventure ends in mystery, leaving ${supportName} and others wondering what really happened...`,
-                madeUp: `In a twist of magical fate, ${protName}'s greatest power becomes their downfall against ${antName}...`
+                confirmed: `${protName} returns from their dangerous venture wounded and empty-handed. The ${getSpecificProblem(act1Choice.theme)} has only worsened in their absence, and even ${supportName}'s unwavering support cannot lift the weight of ${protName}'s failure. ${townInfo.name} must face its decline without false hope...`,
+                rumored: `${protName} vanishes during their mysterious journey, leaving only cryptic messages and strange signs. ${supportName} searches desperately for answers, but the truth of what befell ${protName} - and whether their quest could have saved ${townInfo.name} - remains forever unknown...`,
+                madeUp: `${protName}'s mystical powers prove to be a curse in disguise. In trying to restore the ${act1Choice.theme} sites, they accidentally awaken the very forces that destroyed them originally. ${antName} seizes control of these dark powers, and ${protName}'s noble intentions doom ${townInfo.name} to an even darker fate...`
             },
             change: {
-                confirmed: `${protName}'s actions bring real change to ${townInfo.name}, though the ${act1Choice.theme} problems require ongoing work...`,
-                rumored: `${protName} brings mysterious changes to ${townInfo.name}, leaving ${supportName} uncertain about the future...`,
-                madeUp: `${protName}'s magical transformation shifts the very nature of ${townInfo.name} in wondrous ways...`
+                confirmed: `${protName} returns from their journey with partial solutions - not the miracle ${townInfo.name} hoped for, but real progress nonetheless. The ${getSpecificProblem(act1Choice.theme)} begins to heal slowly, and ${supportName} helps the community adapt to their changing circumstances with newfound resilience...`,
+                rumored: `${protName}'s mysterious adventure brings subtle but profound changes to ${townInfo.name}. The industrial sites remain damaged, but people whisper of strange new opportunities that ${protName} somehow set in motion. ${supportName} watches these changes with both hope and uncertainty...`,
+                madeUp: `${protName}'s magical journey transforms not the ${act1Choice.theme} sites themselves, but the very nature of how ${townInfo.name} relates to industry and progress. With ${supportName}'s guidance, the community discovers that their future lies not in restoring the past, but in embracing entirely new possibilities...`
             }
         },
         'industrial-discovery': {
             triumph: {
-                confirmed: `${protName}'s investigation reveals the truth about the ${act1Choice.theme} problems, leading to real solutions for ${townInfo.name}...`,
-                rumored: `The secrets ${protName} uncovered bring hope, though ${supportName} knows some mysteries remain...`,
-                madeUp: `${protName}'s mystical discoveries unlock ancient powers that restore ${townInfo.name} to glory...`
+                confirmed: `${protName}'s careful investigation finally uncovers ${getSpecificSolution(act2Choice.theme, act1Choice.theme)}. Armed with this knowledge, they work with ${supportName} to address the ${getSpecificProblem(act1Choice.theme)} systematically. The truth, though painful, provides ${townInfo.name} with a clear path forward...`,
+                rumored: `${protName} discovers disturbing secrets about the ${getSpecificProblem(act1Choice.theme)}, but the knowledge comes wrapped in mystery. ${supportName} helps piece together the implications, and while some questions remain unanswered, ${townInfo.name} begins to heal from understanding what really happened...`,
+                madeUp: `${protName}'s mystical investigation reveals that the ${getSpecificProblem(act1Choice.theme)} was caused by ancient forces beyond mortal understanding. With ${supportName} as their guide, they unlock forgotten powers that not only restore ${townInfo.name} but elevate it to legendary status...`
             },
             tragedy: {
-                confirmed: `${protName}'s discoveries reveal that the ${act1Choice.theme} problems run deeper than anyone imagined...`,
-                rumored: `The truth ${protName} found is too terrible to share, leaving ${supportName} burdened with hidden knowledge...`,
-                madeUp: `${protName}'s mystical investigation awakens dark forces that ${antName} uses to devastating effect...`
+                confirmed: `${protName}'s investigation reveals the horrible truth - the ${getSpecificProblem(act1Choice.theme)} was deliberately caused by those the community trusted most. The betrayal runs so deep that even with ${supportName}'s support, ${protName} realizes that some wounds can never heal. ${townInfo.name}'s faith in itself is shattered forever...`,
+                rumored: `${protName} uncovers fragmentary evidence about the ${getSpecificProblem(act1Choice.theme)}, but the truth is too dangerous to reveal fully. ${supportName} watches helplessly as ${protName} is consumed by the burden of terrible knowledge they cannot share, leaving ${townInfo.name} to suffer in ignorance...`,
+                madeUp: `${protName}'s mystical investigation awakens the very dark forces that originally caused the ${getSpecificProblem(act1Choice.theme)}. Despite ${supportName}'s desperate warnings, ${protName} delves too deep and becomes a conduit for ancient evil. ${antName} seizes this power, and ${townInfo.name} faces a fate worse than its original troubles...`
             },
             change: {
-                confirmed: `${protName}'s discoveries force ${townInfo.name} to confront uncomfortable truths about the ${act1Choice.theme} situation...`,
-                rumored: `The knowledge ${protName} gained brings change to ${townInfo.name}, though ${supportName} fears what else might be revealed...`,
-                madeUp: `${protName}'s revelations transform how everyone in ${townInfo.name} sees reality itself...`
+                confirmed: `${protName}'s discovery about ${getSpecificSolution(act2Choice.theme, act1Choice.theme)} changes everything the community believed about the ${getSpecificProblem(act1Choice.theme)}. While ${supportName} helps the town adapt to these revelations, not everyone welcomes the truth. ${townInfo.name} must rebuild not just its industry, but its entire sense of identity...`,
+                rumored: `${protName}'s investigation yields cryptic clues about the ${getSpecificProblem(act1Choice.theme)} that reshape how ${townInfo.name} sees its past. ${supportName} helps interpret these mysterious findings, but their implications remain unclear. The community changes, but whether for better or worse, only time will tell...`,
+                madeUp: `${protName}'s mystical revelations about the ${getSpecificProblem(act1Choice.theme)} transform the very nature of reality around ${townInfo.name}. With ${supportName}'s wisdom, the community learns to navigate a world where the boundaries between the mundane and the magical have forever shifted...`
             }
         },
         'industrial-conflict': {
             triumph: {
-                confirmed: `${protName} overcomes ${antName}'s resistance and brings positive change to the ${act1Choice.theme} problems...`,
-                rumored: `Though ${protName} defeats ${antName}, ${supportName} wonders if the victory will hold...`,
-                madeUp: `${protName} vanquishes the dark forces commanded by ${antName}, freeing ${townInfo.name} from corruption...`
+                confirmed: `${protName} confronts ${antName} directly about ${getSpecificSolution(act2Choice.theme, act1Choice.theme)}, and despite fierce resistance, emerges victorious. With ${supportName} rallying community support, they systematically dismantle the forces that perpetuated the ${getSpecificProblem(act1Choice.theme)}. ${townInfo.name} finally breaks free from the chains that held it back...`,
+                rumored: `The confrontation between ${protName} and ${antName} over the ${getSpecificProblem(act1Choice.theme)} ends in ${protName}'s favor, but through mysterious means. ${supportName} witnesses strange events that suggest the victory came at a hidden cost. Still, ${townInfo.name} prospers, even if the reasons remain unclear...`,
+                madeUp: `${protName} wages an epic mystical battle against ${antName} and the dark forces behind the ${getSpecificProblem(act1Choice.theme)}. With ${supportName} channeling the community's collective will, they banish the corruption forever. ${townInfo.name} is transformed into a beacon of hope that shines across the land...`
             },
             tragedy: {
-                confirmed: `Despite brave efforts, ${protName} cannot overcome ${antName} and the ${act1Choice.theme} problems persist...`,
-                rumored: `The battle between ${protName} and ${antName} ends in mystery, with ${supportName} left to wonder who really won...`,
-                madeUp: `${protName}'s power proves insufficient against ${antName}'s dark magic, dooming ${townInfo.name}...`
+                confirmed: `${protName}'s brave confrontation with ${antName} over the ${getSpecificProblem(act1Choice.theme)} ends in crushing defeat. Despite ${supportName}'s desperate assistance, ${antName}'s control proves too entrenched. ${townInfo.name} learns that some evils are too powerful to overcome through courage alone...`,
+                rumored: `The conflict between ${protName} and ${antName} reaches a mysterious climax that leaves both changed. ${supportName} can only watch as ${protName} pays a terrible price for their defiance. Whether ${protName} won or lost becomes unclear, but ${townInfo.name} remains trapped by the ${getSpecificProblem(act1Choice.theme)}...`,
+                madeUp: `${protName}'s mystical powers prove insufficient against the ancient evil that ${antName} channels through the ${getSpecificProblem(act1Choice.theme)}. In their final moments, ${protName} saves ${supportName} but dooms themselves. ${townInfo.name} falls to darkness, but legends of ${protName}'s sacrifice echo through eternity...`
             },
             change: {
-                confirmed: `${protName}'s conflict with ${antName} transforms ${townInfo.name}, though the outcome affects everyone differently...`,
-                rumored: `The struggle between ${protName} and ${antName} brings change that ${supportName} cannot fully understand...`,
-                madeUp: `The epic battle reshapes the very fabric of reality around ${townInfo.name}...`
+                confirmed: `${protName}'s confrontation with ${antName} changes both adversaries forever. Neither truly wins, but their conflict forces ${townInfo.name} to confront the reality of the ${getSpecificProblem(act1Choice.theme)}. With ${supportName}'s guidance, the community learns to navigate a new world where old certainties no longer apply...`,
+                rumored: `The mysterious struggle between ${protName} and ${antName} transforms them both in ways that ${supportName} cannot fully comprehend. The ${getSpecificProblem(act1Choice.theme)} shifts into something different - not solved, but changed. ${townInfo.name} adapts to this new reality, uncertain but resilient...`,
+                madeUp: `The epic battle between ${protName} and ${antName} tears holes in reality itself, fundamentally altering the nature of the ${getSpecificProblem(act1Choice.theme)}. With ${supportName} as their anchor, ${protName} learns to master these new cosmic forces. ${townInfo.name} becomes a place where miracles and disasters walk hand in hand...`
+            }
+        },
+        // Market-based story progressions
+        'market-adventure': {
+            triumph: {
+                confirmed: `${protName}'s commercial venture succeeds beyond all expectations, establishing ${getSpecificSolution(act2Choice.theme, act1Choice.theme)}. ${supportName} helps coordinate the new prosperity, and the ${getSpecificProblem(act1Choice.theme)} become memories as ${townInfo.name} thrives with renewed commerce...`,
+                rumored: `${protName} returns from their mysterious trading journey with wealth and connections that seem almost too good to be true. Though ${supportName} questions the source of this fortune, the revival of ${townInfo.name}'s commerce speaks for itself...`,
+                madeUp: `${protName} discovers magical trade routes that connect ${townInfo.name} to markets in distant realms. With ${supportName} managing the mundane details, these mystical commercial ventures transform the town into a legendary trading hub...`
+            },
+            tragedy: {
+                confirmed: `${protName}'s ambitious trading venture collapses spectacularly, leaving them deeper in debt than before. Even ${supportName}'s practical support cannot salvage the situation. The ${getSpecificProblem(act1Choice.theme)} worsen as ${townInfo.name} loses what little commerce remained...`,
+                rumored: `${protName} disappears during their trading expedition, leaving only debts and broken promises. ${supportName} searches desperately for answers, but the truth of what befell ${protName} remains as elusive as the prosperity they sought...`,
+                madeUp: `${protName}'s mystical trading ventures anger powerful entities from other realms. ${antName} exploits these supernatural debts, and ${protName}'s attempt to restore commerce instead curses ${townInfo.name} with perpetual poverty...`
+            },
+            change: {
+                confirmed: `${protName}'s trading venture brings unexpected results - not the windfall hoped for, but strange new connections that slowly reshape ${townInfo.name}'s economy. ${supportName} helps the community adapt to these shifting commercial realities...`,
+                rumored: `${protName}'s mysterious business dealings create ripple effects that ${supportName} struggles to understand. The market changes, but whether these transformations will benefit ${townInfo.name} remains to be seen...`,
+                madeUp: `${protName}'s magical commerce fundamentally alters the relationship between ${townInfo.name} and the concept of trade itself. With ${supportName}'s wisdom, the community learns to navigate an economy where value and meaning have been mystically redefined...`
             }
         }
-        // Add more progression patterns as needed
     };
     
     // Try to get specific contextual template
@@ -1883,28 +2107,46 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
         return contextualTemplates[storyProgression][act3Theme][type];
     }
     
-    // Fallback: Create a generic contextual ending that references previous acts
+    // Fallback: Create enhanced generic contextual ending that references previous acts
     const actionWords = {
-        'adventure': 'brave journey',
-        'discovery': 'investigation',
-        'conflict': 'struggle'
+        'adventure': 'bold journey',
+        'discovery': 'careful investigation',
+        'conflict': 'determined confrontation'
+    };
+    
+    const actionResults = {
+        'adventure': {
+            'triumph': 'returns with exactly what was needed',
+            'tragedy': 'comes back empty-handed and broken',
+            'change': 'brings back unexpected opportunities'
+        },
+        'discovery': {
+            'triumph': 'uncovers the crucial truth',
+            'tragedy': 'learns secrets too terrible to bear',
+            'change': 'finds answers that reshape everything'
+        },
+        'conflict': {
+            'triumph': 'overcomes all opposition',
+            'tragedy': 'is defeated despite their courage',
+            'change': 'transforms both victor and vanquished'
+        }
     };
     
     const genericContextual = {
         triumph: {
-            confirmed: `Through ${protName}'s ${actionWords[act2Choice.theme]}, the ${act1Choice.theme} problems are resolved and ${townInfo.name} prospers...`,
-            rumored: `${protName}'s ${actionWords[act2Choice.theme]} brings hope to ${townInfo.name}, though ${supportName} knows mysteries remain...`,
-            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} transforms ${townInfo.name} into a realm of wonder...`
+            confirmed: `Through ${protName}'s ${actionWords[act2Choice.theme]}, they ${actionResults[act2Choice.theme]['triumph']} and systematically address the ${getSpecificProblem(act1Choice.theme)}. With ${supportName} coordinating community efforts, ${townInfo.name} finally overcomes its greatest challenges and prospers...`,
+            rumored: `${protName}'s ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['triumph']} through mysterious means. While ${supportName} cannot fully understand what happened, the ${getSpecificProblem(act1Choice.theme)} begin to heal in ways no one expected...`,
+            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['triumph']} beyond mortal comprehension. With ${supportName} anchoring them to reality, they transform ${townInfo.name} into a realm where the ${getSpecificProblem(act1Choice.theme)} become sources of wonder rather than woe...`
         },
         tragedy: {
-            confirmed: `Despite ${protName}'s ${actionWords[act2Choice.theme]}, the ${act1Choice.theme} challenges prove insurmountable...`,
-            rumored: `${protName}'s ${actionWords[act2Choice.theme]} ends in mystery, leaving ${supportName} with unanswered questions...`,
-            madeUp: `${protName}'s ${actionWords[act2Choice.theme]} awakens powers that prove too dangerous, bringing ruin to ${townInfo.name}...`
+            confirmed: `Despite ${protName}'s ${actionWords[act2Choice.theme]}, they ${actionResults[act2Choice.theme]['tragedy']} and the ${getSpecificProblem(act1Choice.theme)} prove insurmountable. Even ${supportName}'s unwavering support cannot prevent ${townInfo.name} from facing its harsh destiny...`,
+            rumored: `${protName}'s ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['tragedy']} in ways that ${supportName} struggles to comprehend. The ${getSpecificProblem(act1Choice.theme)} remain unsolved, wrapped in mysteries that may never be unraveled...`,
+            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['tragedy']} when ancient powers prove too dangerous to control. Despite ${supportName}'s desperate attempts to help, ${townInfo.name} faces an even darker fate than the original ${getSpecificProblem(act1Choice.theme)}...`
         },
         change: {
-            confirmed: `${protName}'s ${actionWords[act2Choice.theme]} brings lasting change to ${townInfo.name}'s ${act1Choice.theme} situation...`,
-            rumored: `The changes from ${protName}'s ${actionWords[act2Choice.theme]} leave ${supportName} wondering what the future holds...`,
-            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} transforms the very essence of ${townInfo.name}...`
+            confirmed: `${protName}'s ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['change']} about the ${getSpecificProblem(act1Choice.theme)}. While ${supportName} helps the community adapt, ${townInfo.name} must learn to thrive in a world where old assumptions no longer apply...`,
+            rumored: `${protName}'s ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['change']} in ways that ${supportName} finds both hopeful and troubling. The ${getSpecificProblem(act1Choice.theme)} evolve into something new, but whether that's blessing or curse remains unclear...`,
+            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['change']} the fundamental nature of the ${getSpecificProblem(act1Choice.theme)}. With ${supportName}'s wisdom guiding them, ${townInfo.name} becomes a place where reality itself bends to accommodate new possibilities...`
         }
     };
     
@@ -2414,8 +2656,18 @@ function generateAudienceReactions(effectiveness) {
 }
 
 function calculateEarnings(effectiveness) {
-    const basePerformanceFee = 20;
-    let tips = Math.floor(Math.random() * 30 * (effectiveness / 100));
+    // REBALANCED ECONOMY v2.0
+    // Target: Complete game in 12-20 successful performances (matching design doc)
+    // 
+    // NEW INCOME RANGES PER PERFORMANCE:
+    // - New player (no relationships): ~80-200 gold/night
+    // - Experienced (some friends): ~200-400 gold/night  
+    // - Expert (confidants + reputation): ~400-600+ gold/night
+    //
+    // With retirement goals of 6,000-10,000 gold, this creates achievable progression
+    
+    const basePerformanceFee = 80; // Increased from 20
+    let tips = Math.floor(Math.random() * 120 * (effectiveness / 100)); // 0-120 based on effectiveness
     let bonuses = 0;
     
     // Calculate audience-specific bonuses
@@ -2424,11 +2676,17 @@ function calculateEarnings(effectiveness) {
         let satisfiedAudience = 0;
         
         gameState.audienceReactions.forEach(reaction => {
-            // Friends and confidants tip more generously
-            if (reaction.relationship === 'friend' && reaction.score >= 60) {
-                personalBonuses += Math.floor(Math.random() * 8) + 2; // 2-10 gold
-            } else if (reaction.relationship === 'confidant' && reaction.score >= 50) {
-                personalBonuses += Math.floor(Math.random() * 15) + 5; // 5-20 gold
+            // All satisfied audience members provide some bonus
+            if (reaction.score >= 60) {
+                // Base satisfaction bonus
+                personalBonuses += Math.floor(Math.random() * 15) + 10; // 10-25 gold per satisfied patron
+                
+                // Relationship bonuses on top
+                if (reaction.relationship === 'friend') {
+                    personalBonuses += Math.floor(Math.random() * 20) + 15; // +15-35 gold for friends
+                } else if (reaction.relationship === 'confidant') {
+                    personalBonuses += Math.floor(Math.random() * 40) + 30; // +30-70 gold for confidants
+                }
             }
             
             // Count satisfied audience members
@@ -2439,11 +2697,28 @@ function calculateEarnings(effectiveness) {
         
         bonuses += personalBonuses;
         
-        // Group bonus for highly satisfied audience
+        // Group bonus for highly satisfied audience (stronger bonus)
         const satisfactionRate = satisfiedAudience / gameState.audienceReactions.length;
         if (satisfactionRate >= 0.75) {
-            bonuses += Math.floor(Math.random() * 10) + 5; // 5-15 gold group bonus
+            bonuses += Math.floor(Math.random() * 50) + 50; // 50-100 gold group bonus
+        } else if (satisfactionRate >= 0.5) {
+            bonuses += Math.floor(Math.random() * 25) + 25; // 25-50 gold partial group bonus
         }
+        
+        // Reputation bonus
+        const reputationBonuses = {
+            'Famous': 100,
+            'Well-Known': 60, 
+            'Respected': 40,
+            'Known': 20,
+            'Neutral': 0,
+            'Disliked': -20,
+            'Hated': -40,
+            'Notorious': -60
+        };
+        
+        const repBonus = reputationBonuses[gameState.reputation] || 0;
+        bonuses += repBonus;
     }
     
     const earnings = {
@@ -2640,33 +2915,33 @@ function getReputationChangeDescription(oldReputation, newReputation) {
     return null; // No change
 }
 
-// Store System
+// Store System - Costs rebalanced for new economy
 const storeItems = {
     provisions: {
         name: 'Provisions',
         description: 'Food and supplies for travel. Each unit feeds you for 3 days of travel.',
-        baseCost: 15,
+        baseCost: 30, // Increased from 15 to match income scaling
         icon: '🥖',
         category: 'survival'
     },
     bodyguards: {
         name: 'Hired Bodyguards',
         description: 'Professional guards to protect you during dangerous travels. Each provides protection for one journey.',
-        baseCost: 50,
+        baseCost: 120, // Increased from 50 to match income scaling
         icon: '⚔️',
         category: 'protection'
     },
     medicine: {
         name: 'Medicine',
         description: 'Healing supplies and remedies. Can save your life if you get sick or injured during travel.',
-        baseCost: 25,
+        baseCost: 60, // Increased from 25 to match income scaling
         icon: '💊',
         category: 'healing'
     },
     wagons: {
         name: 'Wagon',
         description: 'A sturdy wagon that allows you to carry more supplies. Permanent upgrade.',
-        baseCost: 200,
+        baseCost: 500, // Increased from 200 to match income scaling
         icon: '🛒',
         category: 'transport',
         isUpgrade: true
@@ -2674,7 +2949,7 @@ const storeItems = {
     horses: {
         name: 'Horse',
         description: 'A reliable horse for faster, safer travel. Reduces travel time and danger. Permanent upgrade.',
-        baseCost: 300,
+        baseCost: 800, // Increased from 300 to match income scaling
         icon: '🐎',
         category: 'transport',
         isUpgrade: true
@@ -3594,15 +3869,15 @@ function checkLowGoldWarning() {
     if (goldAfterInn < 0) {
         // Player can't afford the inn
         restBtn.style.background = 'linear-gradient(45deg, #8B0000 0%, #DC143C 100%)';
-        restBtn.innerHTML = '💸 Rest for the Night (5 gold) - WARNING: Can\'t Afford!';
+        restBtn.innerHTML = `💸 Rest for the Night (${gameState.innCostPerNight} gold) - WARNING: Can't Afford!`;
     } else if (goldAfterInn < gameState.innCostPerNight * 3) {
         // Player is running low on gold (less than 3 nights remaining)
         restBtn.style.background = 'linear-gradient(45deg, #FF4500 0%, #FF6347 100%)';
-        restBtn.innerHTML = `🌅 Rest for the Night (5 gold) - Low Gold Warning!`;
+        restBtn.innerHTML = `🌅 Rest for the Night (${gameState.innCostPerNight} gold) - Low Gold Warning!`;
     } else {
         // Normal state
         restBtn.style.background = 'linear-gradient(45deg, #8b4513 0%, #a0522d 100%)';
-        restBtn.innerHTML = '🌅 Rest for the Night (5 gold)';
+        restBtn.innerHTML = `🌅 Rest for the Night (${gameState.innCostPerNight} gold)`;
     }
 }
 
@@ -3638,6 +3913,129 @@ function resetGame() {
     
     // Reset HTML
     location.reload();
+}
+
+// Welcome Screen and Instructions System
+function showWelcomeScreen() {
+    document.getElementById('welcome-modal').classList.remove('hidden');
+}
+
+function startGame() {
+    document.getElementById('welcome-modal').classList.add('hidden');
+}
+
+function showInstructions() {
+    // Hide welcome screen if it's open
+    document.getElementById('welcome-modal').classList.add('hidden');
+    
+    // Show instructions
+    document.getElementById('instructions-modal').classList.remove('hidden');
+    loadInstructionsContent();
+}
+
+function closeInstructions() {
+    document.getElementById('instructions-modal').classList.add('hidden');
+}
+
+function loadInstructionsContent() {
+    const instructionsContent = document.getElementById('instructions-content');
+    
+    instructionsContent.innerHTML = `
+        <div style="line-height: 1.6;">
+            <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🎯 Game Objective</h3>
+                <p>Earn <strong>${gameState.retirementGoal.toLocaleString()} gold</strong> to retire comfortably! Each night costs ${gameState.innCostPerNight} gold for lodging (varies by town), and poor reputation can get you chased from town.</p>
+            </section>
+
+            <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🌅 Daily Phase - Gathering Information</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Visit Locations:</strong> Click on taverns, markets, stores, and government buildings</li>
+                    <li><strong>Talk to NPCs:</strong> You have 4 conversations per day - choose wisely!</li>
+                    <li><strong>Gather Information:</strong> Learn <em>confirmed facts</em>, <em>mysterious rumors</em>, or collect gossip</li>
+                    <li><strong>Build Relationships:</strong> Talking to the same people improves your relationship (acquaintance → friend → confidant)</li>
+                    <li><strong>Shop for Supplies:</strong> Visit the 🛒 store to buy provisions, bodyguards, and travel equipment</li>
+                </ul>
+            </section>
+
+            <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🌙 Evening Phase - Crafting Stories</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Check Your Audience:</strong> Each patron has preferences for truth level, themes, and tone</li>
+                    <li><strong>Choose Act I Setting:</strong> Pick from industrial, market, tavern, or government themes</li>
+                    <li><strong>Choose Truth Level:</strong> 
+                        <ul style="margin: 5px 0 5px 20px;">
+                            <li><em>Confirmed:</em> Truth-lovers enjoy these, fantasy-lovers find them boring</li>
+                            <li><em>Rumored:</em> Mystery-lovers enjoy ambiguous tales</li>
+                            <li><em>Made-Up:</em> Fantasy-lovers enjoy creativity, truth-lovers get offended</li>
+                        </ul>
+                    </li>
+                    <li><strong>Choose Act II & III:</strong> Select adventure/discovery/conflict and triumph/tragedy/change</li>
+                    <li><strong>Watch the Preview:</strong> See how your story comes together with character names</li>
+                </ul>
+            </section>
+
+            <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🎭 Performance & Reputation</h3>
+                <div style="background: rgba(139, 69, 19, 0.2); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p><strong>Patron Reactions:</strong></p>
+                    <ul style="margin: 8px 0; padding-left: 20px;">
+                        <li>😍 <strong>Love your story:</strong> Applaud enthusiastically, tip generously</li>
+                        <li>😊 <strong>Enjoy your story:</strong> Nod approvingly, decent tips</li>
+                        <li>😐 <strong>Tolerate your story:</strong> Listen politely, small tips</li>
+                        <li>😠 <strong>Dislike your story:</strong> Frown and complain</li>
+                        <li>🤬 <strong>Hate your story:</strong> Storm out angrily, spread bad word</li>
+                    </ul>
+                </div>
+                
+                <p><strong>Reputation Levels:</strong> Terrible → Poor → Neutral → Decent → Good → Great → Legendary</p>
+                <p style="color: #ffa500;"><strong>Reputation affects:</strong> Store prices, patron patience, and whether you get chased out!</p>
+            </section>
+
+            <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🛤️ Travel Between Towns</h3>
+                <div style="background: rgba(220, 20, 60, 0.1); border: 2px solid #dc143c; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p><strong>⚠️ When You're Chased Out:</strong></p>
+                    <ul style="margin: 8px 0; padding-left: 20px;">
+                        <li><strong>Terrible Reputation:</strong> Angry mob after 2 days</li>
+                        <li><strong>Poor Reputation:</strong> Mayor asks you to leave after 5 days</li>
+                    </ul>
+                </div>
+                
+                <p><strong>Oregon Trail-Style Travel:</strong></p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Choose Your Pace:</strong> Slow (safe), Normal (balanced), Fast (risky)</li>
+                    <li><strong>Manage Supplies:</strong> Provisions feed you, bodyguards protect you, medicine heals you</li>
+                    <li><strong>Face Random Events:</strong> Bandit attacks, river crossings, wild animals, fellow travelers</li>
+                    <li><strong>Make Tough Choices:</strong> Each event offers multiple responses with different risks</li>
+                    <li><strong>Track Your Health:</strong> Excellent → Good → Fair → Poor → Critical</li>
+                </ul>
+            </section>
+
+            <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🛒 Store & Supplies</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li>🥖 <strong>Provisions (15g):</strong> Food for 3 days of travel</li>
+                    <li>⚔️ <strong>Bodyguards (50g):</strong> One-time protection during events</li>
+                    <li>💊 <strong>Medicine (25g):</strong> Heal sickness and injuries</li>
+                    <li>🛒 <strong>Wagon (200g):</strong> Permanent upgrade - carry more supplies</li>
+                    <li>🐎 <strong>Horse (300g):</strong> Permanent upgrade - travel faster and safer</li>
+                </ul>
+                <p style="color: #ffa500;"><em>Tip: Better reputation = lower prices! Stock up before your reputation gets too bad.</em></p>
+            </section>
+
+            <section>
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">💡 Strategy Tips</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Know Your Audience:</strong> Match story types to patron preferences</li>
+                    <li><strong>Build Relationships:</strong> Friends and confidants are more forgiving and tip better</li>
+                    <li><strong>Plan Ahead:</strong> Buy supplies before your reputation gets too low</li>
+                    <li><strong>Balance Risk:</strong> Made-up stories can create amazing reactions or terrible disasters</li>
+                    <li><strong>Save Money:</strong> You need ${gameState.retirementGoal.toLocaleString()} gold, but also funds for daily expenses and travel (aim for 12-20 successful performances)</li>
+                </ul>
+            </section>
+        </div>
+    `;
 }
 
 // Initialize game when page loads
