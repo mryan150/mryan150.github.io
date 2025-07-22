@@ -169,6 +169,53 @@ body {
     font-style: italic;
 }
 
+/* Audience Section */
+.audience-section {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid #8b4513;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.audience-section h3 {
+    color: #daa520;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.audience-member {
+    background: rgba(139, 69, 19, 0.3);
+    border-left: 4px solid #daa520;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.audience-member-info strong {
+    color: #f4e4c1;
+    font-size: 1.0em;
+}
+
+.audience-member-details {
+    color: #ccc;
+    font-size: 0.9em;
+    margin: 5px 0;
+    font-style: italic;
+}
+
+.audience-preferences {
+    color: #daa520;
+    font-size: 0.85em;
+    margin: 3px 0;
+}
+
+.relationship {
+    color: #32cd32;
+    font-size: 0.8em;
+    margin-top: 3px;
+}
+
 /* Story Crafting */
 .story-crafting {
     margin-bottom: 25px;
@@ -354,6 +401,15 @@ button:disabled {
 
 .reaction-item.neutral {
     border-left-color: #ffa500;
+}
+
+.reaction-item.divider {
+    background: rgba(218, 165, 32, 0.2);
+    border-left-color: #daa520;
+    color: #daa520;
+    text-align: center;
+    font-weight: bold;
+    font-style: italic;
 }
 
 .earnings-item {
