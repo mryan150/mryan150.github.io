@@ -1,3 +1,51 @@
+window.showTab = function(tab) {
+    console.log('showTab called with:', tab);
+    document.getElementById('tab-phase').style.display = 'none';
+    document.getElementById('tab-info').style.display = 'none';
+    document.getElementById('tab-rumor').style.display = 'none';
+    document.getElementById('tab-events').style.display = 'none';
+    document.getElementById('tab-phase-btn').classList.remove('active');
+    document.getElementById('tab-info-btn').classList.remove('active');
+    document.getElementById('tab-rumor-btn').classList.remove('active');
+    document.getElementById('tab-events-btn').classList.remove('active');
+    if (tab === 'phase') {
+        document.getElementById('tab-phase').style.display = '';
+        document.getElementById('tab-phase-btn').classList.add('active');
+    } else if (tab === 'info') {
+        document.getElementById('tab-info').style.display = '';
+        document.getElementById('tab-info-btn').classList.add('active');
+        console.log('Info tab shown, calling updateUI to refresh character cards');
+        // Refresh the UI when showing info tab to ensure event handlers are properly attached
+        updateUI();
+    } else if (tab === 'rumor') {
+        document.getElementById('tab-rumor').style.display = '';
+        document.getElementById('tab-rumor-btn').classList.add('active');
+    } else if (tab === 'events') {
+        document.getElementById('tab-events').style.display = '';
+        document.getElementById('tab-events-btn').classList.add('active');
+        console.log('Events tab shown, updating event log display');
+        updateEventLogDisplay();
+    }
+};
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', function() {
+        window.showTab('phase');
+    });
+}
+
+console.log('game.js loaded');
+
+// Add a test event for demonstration (remove this in production)
+function addTestEvent() {
+    const testEvent = {
+        type: 'character',
+        title: 'Test Character Event',
+        description: 'This is a test event to demonstrate the event log system working.',
+        characters: ['Test Character']
+    };
+    addToEventLog(testEvent);
+    console.log('Test event added to log');
+}
 // Game State
 let gameState = {
     gold: 500,
@@ -39,8 +87,1354 @@ let gameState = {
     health: 100, // Health points (0-100)
     consecutiveBadPerformances: 0, // Track string of bad performances
     gameOverReason: null, // Track reason for game over
-    warningsGiven: 0 // Track warnings before exile
+    warningsGiven: 0, // Track warnings before exile
+    // NEW: Story evolution system
+    townStoryState: {}, // Track evolving state of story elements in current town
+    // --- Living World System ---
+    townEvents: [], // Array of events generated each night
+    knownRumors: [], // Array of rumors the player has discovered
+    eventLog: [], // Dwarf Fortress-style event log
+    eventSeeds: [] // Seeds created from stories that influence future events
 };
+
+// --- CHARACTER-LOCATION COMPATIBILITY SYSTEM ---
+const locationCompatibility = {
+    // Define which character types can logically appear in which locations
+    'Mine': {
+        natural: ['Miner', 'Engineer', 'Foreman', 'Blacksmith', 'Merchant', 'Guard'],
+        possible: ['Doctor', 'Priest', 'Mayor'], // Could visit for business
+        unlikely: ['Innkeeper', 'Barmaid', 'Barkeep', 'Farmer', 'Butcher', 'Local Drunk', 'Serving wench'] // Would need special reason
+    },
+    'Market': {
+        natural: ['Merchant', 'Farmer', 'Blacksmith', 'Baker', 'Tailor', 'Guard', 'Butcher'],
+        possible: ['Mayor', 'Priest', 'Doctor', 'Miner', 'Innkeeper', 'Barmaid', 'Barkeep', 'Local Drunk', 'Farmer', 'Docks', 'Serving wench'], // Could be shopping/business
+        unlikely: [] // Market is accessible to most people
+    },
+    'Tavern': {
+        natural: ['Innkeeper', 'Barmaid', 'Barkeep', 'Merchant', 'Traveler', 'Guard', 'Farmer', 'Local Drunk', 'Serving wench', 'Traveling bard', 'Retired soldier'],
+        possible: ['Mayor', 'Priest', 'Doctor', 'Miner', 'Blacksmith', 'Butcher'], // Social visits
+        unlikely: [] // Anyone could reasonably be in a tavern
+    },
+    'Church': {
+        natural: ['Priest', 'Acolyte', 'Pilgrim'],
+        possible: ['Mayor', 'Doctor', 'Farmer', 'Merchant', 'Innkeeper', 'Barmaid', 'Barkeep', 'Butcher', 'Local Drunk', 'Serving wench', 'Traveling bard', 'Retired soldier'], // Worship, meetings
+        unlikely: [] // Anyone could attend church
+    },
+    'Town Hall': {
+        natural: ['Mayor', 'Clerk', 'Guard', 'Tax Collector'],
+        possible: ['Merchant', 'Priest', 'Doctor', 'Traveling bard'], // Official business
+        unlikely: ['Barmaid', 'Innkeeper', 'Barkeep', 'Farmer', 'Butcher', 'Local Drunk', 'Serving wench'] // Unless in trouble or petitioning
+    },
+    'Farm': {
+        natural: ['Farmer', 'Farmhand', 'Merchant', 'Veterinarian'],
+        possible: ['Doctor', 'Priest', 'Mayor', 'Butcher', 'Traveling bard'], // Visits, inspections
+        unlikely: ['Innkeeper', 'Barmaid', 'Barkeep', 'Miner', 'Local Drunk', 'Serving wench'] // No natural reason to be there
+    },
+    'Forest': {
+        natural: ['Hunter', 'Ranger', 'Herbalist', 'Bandit'],
+        possible: ['Doctor', 'Priest', 'Merchant', 'Traveling bard'], // Gathering herbs, pilgrimage, trade routes
+        unlikely: ['Mayor', 'Innkeeper', 'Barmaid', 'Barkeep', 'Butcher', 'Local Drunk', 'Serving wench'] // Too dangerous/no reason
+    },
+    'Docks': {
+        natural: ['Sailor', 'Fisherman', 'Merchant', 'Dock Worker', 'Captain'],
+        possible: ['Mayor', 'Guard', 'Doctor', 'Innkeeper', 'Barmaid', 'Barkeep', 'Butcher', 'Local Drunk', 'Serving wench', 'Traveling bard', 'Retired soldier'], // Official business, emergencies, or trade
+        unlikely: ['Priest', 'Farmer'] // Unless specific religious or trade reason
+    },
+    'Lighthouse': {
+        natural: ['Lighthouse keeper', 'Sea captain', 'Dock Worker', 'Fisherman'],
+        possible: ['Merchant', 'Sailor', 'Harbor master', 'Mayor', 'Traveling bard'],
+        unlikely: ['Farmer', 'Priest', 'Innkeeper', 'Barmaid', 'Barkeep', 'Butcher', 'Local Drunk', 'Serving wench']
+    },
+    'Graveyard': {
+        natural: ['Priest', 'Doctor', 'Farmer', 'Hunter', 'Ranger', 'Guard'],
+        possible: ['Traveling bard'],
+        unlikely: []
+    },
+    'School': {
+        natural: ['Teacher', 'Student', 'Principal', 'Janitor', 'Counselor'],
+        possible: ['Traveling bard'],
+        unlikely: []
+    }
+};
+
+function getValidLocationsForCharacter(targetAudience) {
+    // Handle the 'general' audience case: allow all actual locations in the current town
+    if (targetAudience === 'general') {
+        // Exclude metadata keys like townInfo and allNPCs
+        const townLocations = Object.keys(locations).filter(key => !['townInfo', 'allNPCs'].includes(key));
+        return townLocations.map(locationKey => ({
+            key: locationKey,
+            name: locations[locationKey].name,
+            compatibility: 'possible',
+            description: locations[locationKey].description || 'A setting that could inspire the whole crowd.'
+        }));
+    }
+    if (!targetAudience || !targetAudience.character) return [];
+    
+    // Normalize profession for matching
+    const profession = (targetAudience.character.profession || '').toLowerCase().trim();
+    const validLocations = [];
+    
+    // Get all available locations in town
+    const townLocations = ['Mine', 'Market', 'Tavern', 'Church', 'Town Hall', 'Farm', 'Forest', 'Docks', 'Lighthouse', 'Graveyard', 'School'];
+    
+    console.log('DEBUG: Checking locations for profession:', profession);
+    
+    townLocations.forEach(location => {
+        const compatibility = locationCompatibility[location];
+        if (!compatibility) return;
+        
+        let compatibilityLevel = 'none';
+        // Normalize all entries for comparison
+        const norm = arr => (arr || []).map(x => x.toLowerCase().trim());
+        const nat = norm(compatibility.natural);
+        const pos = norm(compatibility.possible);
+        const unlik = norm(compatibility.unlikely);
+        console.log(`  Location: ${location}`);
+        console.log('    natural:', nat);
+        console.log('    possible:', pos);
+        console.log('    unlikely:', unlik);
+        if (nat.includes(profession)) {
+            compatibilityLevel = 'natural';
+        } else if (pos.includes(profession)) {
+            compatibilityLevel = 'possible';
+        } else if (unlik.includes(profession)) {
+            compatibilityLevel = 'unlikely';
+        }
+        
+        if (compatibilityLevel !== 'none') {
+            validLocations.push({
+                name: location,
+                compatibility: compatibilityLevel,
+                description: getLocationDescription(location, targetAudience.character.profession, compatibilityLevel)
+            });
+        }
+    });
+    
+    console.log('  => validLocations:', validLocations);
+    
+    // Sort by compatibility (natural first, then possible, then unlikely)
+    validLocations.sort((a, b) => {
+        const order = { 'natural': 0, 'possible': 1, 'unlikely': 2 };
+        return order[a.compatibility] - order[b.compatibility];
+    });
+    
+    return validLocations;
+}
+
+function getLocationDescription(location, profession, compatibility) {
+    const descriptions = {
+        'Mine': {
+            'natural': 'A familiar workplace where your character would naturally be found',
+            'possible': 'A place your character might visit for business or inspection',
+            'unlikely': 'An unusual but possible location for your character to appear'
+        },
+        'Market': {
+            'natural': 'The heart of commerce where your character belongs',
+            'possible': 'A place your character might visit for shopping or business',
+            'unlikely': 'An uncommon but feasible location for your character'
+        },
+        'Tavern': {
+            'natural': 'A social hub where your character would feel at home',
+            'possible': 'A place your character might visit for relaxation or meetings',
+            'unlikely': 'A location your character could visit, though uncommon'
+        },
+        'Church': {
+            'natural': 'A sacred space where your character serves or worships',
+            'possible': 'A place your character might visit for prayer or community',
+            'unlikely': 'A location your character could visit, though rarely'
+        },
+        'Town Hall': {
+            'natural': 'The seat of power where your character works or has authority',
+            'possible': 'A place your character might visit for official business',
+            'unlikely': 'A location your character might visit if summoned or petitioning'
+        },
+        'Farm': {
+            'natural': 'Rural lands where your character lives and works',
+            'possible': 'A place your character might visit for trade or assistance',
+            'unlikely': 'A location your character could visit, though uncommon'
+        },
+        'Forest': {
+            'natural': 'Wild lands where your character feels most comfortable',
+            'possible': 'A place your character might venture for resources or travel',
+            'unlikely': 'A dangerous location your character would rarely visit'
+        },
+        'Docks': {
+            'natural': 'Waterfront areas where your character works and thrives',
+            'possible': 'A place your character might visit for trade or transport',
+            'unlikely': 'A location your character could visit, though uncommon'
+        },
+        'Lighthouse': {
+            'natural': 'A towering beacon that guides ships safely to harbor',
+            'possible': 'A place your character might visit for work or leisure',
+            'unlikely': 'A location your character would not normally frequent'
+        },
+        'Graveyard': {
+            'natural': 'A quiet and peaceful place where the dead are laid to rest',
+            'possible': 'A place your character might visit for reflection or solitude',
+            'unlikely': 'A location your character would not normally visit'
+        },
+        'School': {
+            'natural': 'A place of learning and education',
+            'possible': 'A place your character might visit for study or teaching',
+            'unlikely': 'A location your character would not normally visit'
+        }
+    };
+    
+    return descriptions[location]?.[compatibility] || 'A location where your character might appear';
+}
+
+// --- GENERIC STORY CHARACTER SYSTEM ---
+// Instead of using real townspeople as story subjects, use generic archetypes
+// Real townspeople are selected as TARGET AUDIENCE for inspiration
+
+const genericStoryCharacters = {
+    protagonist: {
+        industrial: [
+            "a determined miner", "a skilled craftsperson", "a hardworking laborer", 
+            "a seasoned dock worker", "a brave mill worker", "a resourceful engineer"
+        ],
+        market: [
+            "a young merchant", "a ambitious trader", "a clever baker", 
+            "a honest shopkeeper", "a traveling vendor", "a skilled artisan"
+        ],
+        tavern: [
+            "a charismatic storyteller", "a wise barkeeper", "a friendly innkeeper", 
+            "a wandering musician", "a local regular", "a mysterious traveler"
+        ],
+        government: [
+            "a dedicated clerk", "a honest official", "a reform-minded citizen", 
+            "a brave whistleblower", "a principled leader", "a concerned taxpayer"
+        ],
+        coastal: [
+            "a seasoned sailor", "a skilled fisherman", "a brave lighthouse keeper", 
+            "a weathered captain", "a resourceful dock worker", "a wise harbor master"
+        ],
+        agricultural: [
+            "a hardworking farmer", "a wise landowner", "a dedicated miller", 
+            "a seasonal worker", "a crop inspector", "a livestock handler"
+        ]
+    },
+    supporting: {
+        universal: [
+            "a trusted friend", "a wise mentor", "a loyal companion", 
+            "a helpful neighbor", "a family member", "a fellow worker",
+            "a kind stranger", "an old ally", "a supportive partner"
+        ]
+    },
+    antagonist: {
+        universal: [
+            "a corrupt official", "a greedy merchant", "a ruthless competitor", 
+            "a dishonest authority", "a selfish rival", "a power-hungry leader",
+            "a scheming opponent", "a jealous peer", "a tyrannical boss"
+        ]
+    }
+};
+
+// Generate generic story characters based on theme
+function generateGenericStoryCharacters(theme, targetAudience = null) {
+    const protagonist = randomChoice(genericStoryCharacters.protagonist[theme] || genericStoryCharacters.protagonist.industrial);
+    const supporting = randomChoice(genericStoryCharacters.supporting.universal);
+    const antagonist = randomChoice(genericStoryCharacters.antagonist.universal);
+    
+    return {
+        protagonist: { name: protagonist, isGeneric: true },
+        supportingChar: { name: supporting, isGeneric: true },
+        antagonist: { name: antagonist, isGeneric: true },
+        townInfo: (locations && locations.townInfo) ? locations.townInfo : { name: 'this town', type: 'mining' },
+        // Store target audience for inspiration mechanics
+        targetAudience: targetAudience
+    };
+}
+
+// --- STORY EVOLUTION SYSTEM ---
+function evolveStoryElements(townType) {
+    if (!gameState.townStoryState.elements) {
+        // Initialize town story state on first day
+        initializeTownStoryState(townType);
+        return;
+    }
+
+    const elements = gameState.townStoryState.elements;
+    
+    // Natural progression rules:
+    // 1. Some rumors become confirmed (20% chance each day)
+    // 2. Some confirmed facts become "old news" and fade (10% chance)
+    // 3. New rumors occasionally appear (30% chance of 1-2 new rumors)
+    // 4. Very rarely, old rumors are disproven and become "debunked" (5% chance)
+
+    elements.forEach(element => {
+        if (element.currentType === 'rumored' && Math.random() < 0.2) {
+            // Rumor becomes confirmed
+            element.currentType = 'confirmed';
+            element.evolutionHistory.push(`Day ${gameState.day}: Rumor confirmed`);
+        } else if (element.currentType === 'confirmed' && Math.random() < 0.1) {
+            // Confirmed fact becomes old news
+            element.currentType = 'old_news';
+            element.evolutionHistory.push(`Day ${gameState.day}: Became old news`);
+        } else if (element.currentType === 'rumored' && Math.random() < 0.05) {
+            // Rumor is debunked
+            element.currentType = 'debunked';
+            element.evolutionHistory.push(`Day ${gameState.day}: Rumor debunked`);
+        }
+    });
+
+    // Add new rumors occasionally
+    if (Math.random() < 0.3) {
+        const newRumorCount = Math.random() < 0.7 ? 1 : 2;
+        for (let i = 0; i < newRumorCount; i++) {
+            addNewRumor(townType);
+        }
+    }
+}
+
+function initializeTownStoryState(townType) {
+    gameState.townStoryState = {
+        elements: [],
+        townType: townType,
+        dayInitialized: gameState.day
+    };
+
+    // Initialize with base story elements
+    const townSpecificStories = storyElementsByTownType[townType] || {};
+    const universalStories = universalStoryElements;
+
+    // Add town-specific elements
+    Object.keys(townSpecificStories).forEach(categoryKey => {
+        const category = townSpecificStories[categoryKey];
+        category.texts.forEach(text => {
+            gameState.townStoryState.elements.push({
+                id: `${categoryKey}_${Date.now()}_${Math.random()}`,
+                originalText: text,
+                originalType: category.type,
+                currentType: category.type,
+                category: categoryKey,
+                dayAdded: gameState.day,
+                evolutionHistory: [`Day ${gameState.day}: Initial story element`]
+            });
+        });
+    });
+
+    // Add universal elements
+    Object.keys(universalStories).forEach(categoryKey => {
+        const category = universalStories[categoryKey];
+        category.texts.forEach(text => {
+            gameState.townStoryState.elements.push({
+                id: `universal_${categoryKey}_${Date.now()}_${Math.random()}`,
+                originalText: text,
+                originalType: category.type,
+                currentType: category.type,
+                category: `universal_${categoryKey}`,
+                dayAdded: gameState.day,
+                evolutionHistory: [`Day ${gameState.day}: Initial story element`]
+            });
+        });
+    });
+}
+
+function addNewRumor(townType) {
+    const newRumorTemplates = [
+        "Strange lights were seen near the old mill last night",
+        "A merchant claims to have seen unusual tracks on the road",
+        "Someone heard singing coming from the empty house on the hill",
+        "The baker's cat has been acting strangely all week",
+        "A traveling scholar asked odd questions about the town's history",
+        "Children report finding unusual stones by the river",
+        "The weather has been unseasonably calm lately",
+        "A stranger was seen sketching buildings in the town square",
+        "The local dogs have been howling at nothing",
+        "Someone claims the well water tastes different"
+    ];
+
+    const newRumorText = randomChoice(newRumorTemplates);
+    gameState.townStoryState.elements.push({
+        id: `new_rumor_${Date.now()}_${Math.random()}`,
+        originalText: newRumorText,
+        originalType: 'rumored',
+        currentType: 'rumored',
+        category: 'emerging_rumors',
+        dayAdded: gameState.day,
+        evolutionHistory: [`Day ${gameState.day}: New rumor emerged`]
+    });
+}
+
+// --- NIGHTLY EVENTS SYSTEM ---
+const eventTypes = {
+    character: {
+        name: "Character Event",
+        icon: "👤",
+        color: "#6495ed"
+    },
+    town: {
+        name: "Town Event", 
+        icon: "🏘️",
+        color: "#daa520"
+    },
+    mystery: {
+        name: "Mystery Event",
+        icon: "🔍",
+        color: "#9370db"
+    },
+    consequence: {
+        name: "Story Consequence",
+        icon: "📚",
+        color: "#ff6347"
+    },
+    economic: {
+        name: "Economic Event",
+        icon: "💰",
+        color: "#228b22"
+    },
+    social: {
+        name: "Social Event",
+        icon: "👥",
+        color: "#ff69b4"
+    },
+    political: {
+        name: "Political Event",
+        icon: "🏛️",
+        color: "#4169e1"
+    }
+};
+
+// Event templates for generation
+const nightlyEventTemplates = {
+    character: {
+        // Events affecting individual NPCs
+        career_change: {
+            weight: 5,
+            generate: (townInfo, npcs, storyConsequences) => {
+                const eligibleNPCs = npcs.filter(npc => 
+                    npc.character.psychologicalProfile && 
+                    ['dissatisfied', 'ambitious', 'restless'].includes(npc.character.psychologicalProfile.emotionalState)
+                );
+                if (eligibleNPCs.length === 0) return null;
+                
+                const npc = randomChoice(eligibleNPCs);
+                const newProfessions = ['Merchant', 'Guard', 'Farmer', 'Priest', 'Doctor'];
+                const newProfession = randomChoice(newProfessions.filter(p => p !== npc.character.profession));
+                
+                return {
+                    type: 'character',
+                    title: `${npc.name} Changes Career`,
+                    description: `${npc.name} has decided to leave their job as a ${npc.character.profession} and become a ${newProfession}. ${
+                        storyConsequences.some(c => c.includes(npc.name)) 
+                            ? "Your recent story about them seems to have inspired this change."
+                            : "They've been contemplating this change for some time."
+                    }`,
+                    characters: [npc.name],
+                    effects: () => {
+                        npc.character.profession = newProfession;
+                        if (gameState.knownCharacters[npc.name]) {
+                            gameState.knownCharacters[npc.name].character.profession = newProfession;
+                        }
+                    }
+                };
+            }
+        },
+        
+        relationship_change: {
+            weight: 8,
+            generate: (townInfo, npcs, storyConsequences) => {
+                // Find NPCs with relationships that could change
+                const eligiblePairs = [];
+                npcs.forEach(npc1 => {
+                    if (npc1.character.relationships) {
+                        npc1.character.relationships.forEach(rel => {
+                            const npc2 = npcs.find(n => n.name === rel.targetName);
+                            if (npc2 && rel.intensity >= 2) {
+                                eligiblePairs.push({ npc1, npc2, relationship: rel });
+                            }
+                        });
+                    }
+                });
+                
+                if (eligiblePairs.length === 0) return null;
+                
+                const pair = randomChoice(eligiblePairs);
+                const relationshipTypes = ['friend', 'rival', 'business_partner', 'romantic_interest'];
+                const changeTypes = ['strengthen', 'weaken', 'change_nature'];
+                const changeType = randomChoice(changeTypes);
+                
+                let description = "";
+                if (changeType === 'strengthen') {
+                    description = `${pair.npc1.name} and ${pair.npc2.name} have grown closer. Their ${pair.relationship.relationshipType} relationship has deepened.`;
+                } else if (changeType === 'weaken') {
+                    description = `${pair.npc1.name} and ${pair.npc2.name} have had a falling out. Their relationship has become strained.`;
+                } else {
+                    const newType = randomChoice(relationshipTypes.filter(t => t !== pair.relationship.relationshipType));
+                    description = `The relationship between ${pair.npc1.name} and ${pair.npc2.name} has evolved from ${pair.relationship.relationshipType} to ${newType}.`;
+                }
+                
+                return {
+                    type: 'character',
+                    title: `Relationship Change: ${pair.npc1.name} & ${pair.npc2.name}`,
+                    description: description,
+                    characters: [pair.npc1.name, pair.npc2.name],
+                    effects: () => {
+                        // Update the relationship data
+                        if (changeType === 'strengthen') {
+                            pair.relationship.intensity = Math.min(5, pair.relationship.intensity + 1);
+                            pair.relationship.quality = pair.relationship.quality === 'hostile' ? 'neutral' : 'positive';
+                        } else if (changeType === 'weaken') {
+                            pair.relationship.intensity = Math.max(1, pair.relationship.intensity - 1);
+                            pair.relationship.quality = pair.relationship.quality === 'positive' ? 'neutral' : 'hostile';
+                        }
+                    }
+                };
+            }
+        }
+    },
+    
+    town: {
+        economic_shift: {
+            weight: 6,
+            generate: (townInfo, npcs, storyConsequences) => {
+                const economicEvents = [
+                    {
+                        title: 'Trade Route Established',
+                        description: `A new trade route has been established through ${townInfo.name}, bringing increased commerce and opportunity.`,
+                        effects: () => {
+                            // Lower inn costs slightly
+                            gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight - 1);
+                        }
+                    },
+                    {
+                        title: 'Market Day Success',
+                        description: `The weekly market day was particularly successful, with merchants reporting increased sales and new customers.`,
+                        effects: () => {
+                            // Increase NPC mood slightly
+                            npcs.forEach(npc => {
+                                if (npc.character.profession.toLowerCase().includes('merchant')) {
+                                    if (npc.character.psychologicalProfile) {
+                                        npc.character.psychologicalProfile.emotionalState = 'optimistic';
+                                    }
+                                }
+                            });
+                        }
+                    },
+                    {
+                        title: 'Resource Shortage',
+                        description: `Supplies are running low in ${townInfo.name}. Merchants are having trouble restocking their goods.`,
+                        effects: () => {
+                            // Increase inn costs
+                            gameState.innCostPerNight += 1;
+                        }
+                    }
+                ];
+                
+                const event = randomChoice(economicEvents);
+                return {
+                    type: 'economic',
+                    title: event.title,
+                    description: event.description,
+                    characters: [],
+                    effects: event.effects
+                };
+            }
+        },
+        
+        seasonal_event: {
+            weight: 4,
+            generate: (townInfo, npcs, storyConsequences) => {
+                const seasonalEvents = [
+                    {
+                        title: 'Harvest Festival Preparations',
+                        description: `The town is preparing for the annual harvest festival. Decorations are being put up and special foods are being prepared.`
+                    },
+                    {
+                        title: 'Storm Passes',
+                        description: `A fierce storm passed through ${townInfo.name} last night, but the damage was minimal. The townspeople are helping each other clean up.`
+                    },
+                    {
+                        title: 'Traveling Merchants Arrive',
+                        description: `A caravan of traveling merchants has arrived in ${townInfo.name}, bringing exotic goods and news from distant lands.`
+                    },
+                    {
+                        title: 'Local Celebration',
+                        description: `The town is celebrating a local holiday. Music and laughter fill the streets as neighbors come together.`
+                    }
+                ];
+                
+                const event = randomChoice(seasonalEvents);
+                return {
+                    type: 'town',
+                    title: event.title,
+                    description: event.description,
+                    characters: [],
+                    effects: () => {
+                        // Boost general town mood
+                        npcs.forEach(npc => {
+                            if (Math.random() < 0.3 && npc.character.psychologicalProfile) {
+                                const positiveStates = ['content', 'optimistic', 'cheerful'];
+                                npc.character.psychologicalProfile.emotionalState = randomChoice(positiveStates);
+                            }
+                        });
+                    }
+                };
+            }
+        }
+    },
+    
+    mystery: {
+        new_mystery: {
+            weight: 3,
+            generate: (townInfo, npcs, storyConsequences) => {
+                const mysteries = [
+                    {
+                        title: 'Strange Lights Reported',
+                        description: `Several townspeople report seeing unusual lights near the outskirts of ${townInfo.name} during the night. No one knows what could be causing them.`,
+                        rumor: "Strange lights have been seen moving through the darkness outside town"
+                    },
+                    {
+                        title: 'Missing Item Mystery',
+                        description: `A valuable item has gone missing from the town hall. Officials are investigating, but so far there are no leads.`,
+                        rumor: "Something important has disappeared from the town hall under mysterious circumstances"
+                    },
+                    {
+                        title: 'Unusual Animal Behavior',
+                        description: `The local animals have been acting strangely - dogs barking at empty spaces, cats refusing to enter certain areas.`,
+                        rumor: "The animals seem to sense something the townspeople cannot"
+                    },
+                    {
+                        title: 'Mysterious Visitor',
+                        description: `A hooded figure was seen asking questions around town before disappearing. No one knows who they were or what they wanted.`,
+                        rumor: "A mysterious stranger was asking odd questions about the town's history"
+                    }
+                ];
+                
+                const mystery = randomChoice(mysteries);
+                return {
+                    type: 'mystery',
+                    title: mystery.title,
+                    description: mystery.description,
+                    characters: [],
+                    effects: () => {
+                        // Add a new rumor to the story elements
+                        if (gameState.townStoryState && gameState.townStoryState.elements) {
+                            gameState.townStoryState.elements.push({
+                                id: `mystery_rumor_${Date.now()}_${Math.random()}`,
+                                originalText: mystery.rumor,
+                                originalType: 'rumored',
+                                currentType: 'rumored',
+                                category: 'mystery_rumors',
+                                dayAdded: gameState.day,
+                                evolutionHistory: [`Day ${gameState.day}: Mystery emerged from nightly events`]
+                            });
+                        }
+                    }
+                };
+            }
+        }
+    },
+    
+    consequence: {
+        story_impact: {
+            weight: 10,
+            generate: (townInfo, npcs, storyConsequences) => {
+                if (storyConsequences.length === 0) return null;
+                
+                // Create events based on last night's story consequences
+                const consequence = randomChoice(storyConsequences);
+                const impactTypes = [
+                    {
+                        title: 'Story Inspires Action',
+                        description: `Your story from last night has inspired someone in the community. ${consequence}`
+                    },
+                    {
+                        title: 'Tale Spreads Through Town',
+                        description: `People are still talking about your story from last night. ${consequence} The tale is spreading through the community.`
+                    },
+                    {
+                        title: 'Story Changes Perspective',
+                        description: `Your storytelling has shifted how people think about recent events. ${consequence}`
+                    }
+                ];
+                
+                const impact = randomChoice(impactTypes);
+                return {
+                    type: 'consequence',
+                    title: impact.title,
+                    description: impact.description,
+                    characters: [],
+                    effects: () => {
+                        // Stories can slightly improve relationships with audience members
+                        gameState.eveningAudience.forEach(audienceMember => {
+                            if (gameState.knownCharacters[audienceMember.name] && Math.random() < 0.2) {
+                                const char = gameState.knownCharacters[audienceMember.name];
+                                if (char.relationshipLevel === 'acquaintance') {
+                                    char.relationshipLevel = 'friend';
+                                } else if (char.relationshipLevel === 'friend' && Math.random() < 0.1) {
+                                    char.relationshipLevel = 'confidant';
+                                }
+                            }
+                        });
+                    }
+                };
+            }
+        }
+    }
+};
+
+function generateNightlyEvents(townInfo, npcs, storyConsequences) {
+    const events = [];
+    const numEvents = 1 + Math.floor(Math.random() * 3); // 1-3 events per night
+    
+    // Calculate total weights for each category
+    const categoryWeights = {};
+    Object.keys(nightlyEventTemplates).forEach(category => {
+        categoryWeights[category] = Object.values(nightlyEventTemplates[category])
+            .reduce((sum, template) => sum + template.weight, 0);
+    });
+    
+    for (let i = 0; i < numEvents; i++) {
+        // Choose a random category
+        const totalWeight = Object.values(categoryWeights).reduce((sum, weight) => sum + weight, 0);
+        let randomValue = Math.random() * totalWeight;
+        let selectedCategory = null;
+        
+        for (const [category, weight] of Object.entries(categoryWeights)) {
+            randomValue -= weight;
+            if (randomValue <= 0) {
+                selectedCategory = category;
+                break;
+            }
+        }
+        
+        if (selectedCategory) {
+            // Choose a random template from the selected category
+            const templates = nightlyEventTemplates[selectedCategory];
+            const templateNames = Object.keys(templates);
+            const templateWeights = templateNames.map(name => templates[name].weight);
+            const totalTemplateWeight = templateWeights.reduce((sum, weight) => sum + weight, 0);
+            
+            let templateRandom = Math.random() * totalTemplateWeight;
+            let selectedTemplate = null;
+            
+            for (let j = 0; j < templateNames.length; j++) {
+                templateRandom -= templateWeights[j];
+                if (templateRandom <= 0) {
+                    selectedTemplate = templates[templateNames[j]];
+                    break;
+                }
+            }
+            
+            if (selectedTemplate) {
+                const event = selectedTemplate.generate(townInfo, npcs, storyConsequences);
+                if (event) {
+                    events.push(event);
+                }
+            }
+        }
+    }
+    
+    return events;
+}
+
+function processNightlyEvents() {
+    if (!locations || !locations.townInfo || !locations.allNPCs) return;
+    
+    const townInfo = locations.townInfo;
+    const npcs = locations.allNPCs;
+    const storyConsequences = gameState.consequences || [];
+    
+    // Generate events using the new seeded system
+    const events = generateSeededEvents(townInfo, npcs, storyConsequences);
+    
+    // Process each event
+    events.forEach(event => {
+        // Apply event effects
+        if (event.effects) {
+            event.effects();
+        }
+        
+        // Add to event log
+        addToEventLog(event);
+        
+        // Add to game state for potential display
+        gameState.townEvents.push({
+            ...event,
+            day: gameState.day,
+            townName: townInfo.name
+        });
+    });
+    
+    console.log(`Generated ${events.length} nightly events for ${townInfo.name} (${events.filter(e => e.seed).length} from story seeds)`);
+}
+
+// --- STORY-DRIVEN EVENT MANIPULATION SYSTEM ---
+//
+// This system allows the bard's storytelling choices to directly influence future events:
+//
+// 1. STORY ANALYSIS: When a story is told, analyzeStoryForEventSeeds() examines:
+//    - Target audience (creates character-focused events)
+//    - Story themes (economic, mystery, relationship, etc.)
+//    - Location setting (influences location-based events) 
+//    - Truth level (confirmed vs rumored vs madeUp affects event types)
+//
+// 2. EVENT SEEDING: Seeds are created that last 3 days and influence event generation:
+//    - Character Focus: Stories about specific NPCs create events affecting them
+//    - Thematic Influence: Story themes bias toward related event types
+//    - Location Focus: Stories set in specific places affect those locations
+//    - Fiction/Truth Influence: Made-up vs true stories create different outcomes
+//
+// 3. SEEDED GENERATION: processNightlyEvents() prioritizes seeded events (70% chance)
+//    over random events, making the bard's narrative choices directly shape the world
+//
+// 4. PLAYER FEEDBACK: The Events tab shows which events were story-inspired and
+//    displays active seeds so players understand their narrative power
+
+function analyzeStoryForEventSeeds(storyChoices) {
+    const seeds = [];
+    
+    if (!storyChoices.targetAudience || !storyChoices.location || !storyChoices.event) {
+        return seeds;
+    }
+    
+    // Analyze target audience - stories about specific people create character events
+    if (storyChoices.targetAudience !== 'general' && storyChoices.targetAudience.name) {
+        const character = storyChoices.targetAudience;
+        seeds.push({
+            type: 'character_focus',
+            target: character.name,
+            weight: 3,
+            eventTypes: ['career_change', 'relationship_change', 'personal_growth'],
+            reason: `Story focused on ${character.name}`
+        });
+    }
+    
+    // Analyze story event type and theme
+    const eventType = storyChoices.event.type; // confirmed, rumored, madeUp
+    const eventTheme = categorizeEventTheme(storyChoices.event);
+    
+    if (eventTheme === 'economic') {
+        seeds.push({
+            type: 'thematic_influence',
+            theme: 'economic',
+            weight: 2,
+            eventTypes: ['economic_shift', 'trade_opportunity'],
+            reason: `Story contained economic themes`
+        });
+    } else if (eventTheme === 'mystery') {
+        seeds.push({
+            type: 'thematic_influence',
+            theme: 'mystery',
+            weight: 2,
+            eventTypes: ['new_mystery', 'mystery_resolution'],
+            reason: `Story contained mysterious elements`
+        });
+    } else if (eventTheme === 'relationship') {
+        seeds.push({
+            type: 'thematic_influence',
+            theme: 'relationship',
+            weight: 2,
+            eventTypes: ['relationship_change', 'social_gathering'],
+            reason: `Story explored relationships`
+        });
+    }
+    
+    // Analyze story resolution impact
+    const location = storyChoices.location;
+    if (location && location.name) {
+        seeds.push({
+            type: 'location_focus',
+            target: location.name,
+            weight: 2,
+            eventTypes: ['location_change', 'economic_shift'],
+            reason: `Story set in ${location.name}`
+        });
+    }
+    
+    // Truth level influences event manifestation
+    if (eventType === 'madeUp') {
+        seeds.push({
+            type: 'fiction_influence',
+            weight: 1,
+            eventTypes: ['mystery_emergence', 'rumor_spread'],
+            reason: `Fictional story may inspire real events`
+        });
+    } else if (eventType === 'confirmed') {
+        seeds.push({
+            type: 'truth_influence',
+            weight: 2,
+            eventTypes: ['practical_action', 'community_response'],
+            reason: `True story inspires practical action`
+        });
+    }
+    
+    return seeds;
+}
+
+function categorizeEventTheme(event) {
+    const title = event.title.toLowerCase();
+    const description = event.description.toLowerCase();
+    const text = title + ' ' + description;
+    
+    if (text.includes('trade') || text.includes('merchant') || text.includes('market') || text.includes('gold') || text.includes('business')) {
+        return 'economic';
+    } else if (text.includes('mystery') || text.includes('strange') || text.includes('unknown') || text.includes('secret')) {
+        return 'mystery';
+    } else if (text.includes('love') || text.includes('friend') || text.includes('relationship') || text.includes('family')) {
+        return 'relationship';
+    } else if (text.includes('rescue') || text.includes('danger') || text.includes('hero') || text.includes('brave')) {
+        return 'heroic';
+    } else if (text.includes('magic') || text.includes('enchanted') || text.includes('curse') || text.includes('prophecy')) {
+        return 'magical';
+    }
+    
+    return 'general';
+}
+
+function seedEventsFromStory(storyChoices) {
+    if (!gameState.eventSeeds) {
+        gameState.eventSeeds = [];
+    }
+    
+    const newSeeds = analyzeStoryForEventSeeds(storyChoices);
+    
+    // Add new seeds to the pool
+    newSeeds.forEach(seed => {
+        seed.dayCreated = gameState.day;
+        seed.expiresDay = gameState.day + 3; // Seeds last for 3 days
+        gameState.eventSeeds.push(seed);
+    });
+    
+    // Remove expired seeds
+    gameState.eventSeeds = gameState.eventSeeds.filter(seed => seed.expiresDay >= gameState.day);
+    
+    console.log(`Added ${newSeeds.length} event seeds from story:`, newSeeds);
+}
+
+// Enhanced event generation that uses story seeds
+function generateSeededEvents(townInfo, npcs, storyConsequences) {
+    const events = [];
+    const seeds = gameState.eventSeeds || [];
+    
+    // First, try to generate events from seeds (higher priority)
+    seeds.forEach(seed => {
+        if (Math.random() < 0.7) { // 70% chance to manifest each seed
+            const seededEvent = generateEventFromSeed(seed, townInfo, npcs, storyConsequences);
+            if (seededEvent) {
+                events.push(seededEvent);
+                console.log(`Generated seeded event: ${seededEvent.title} (from: ${seed.reason})`);
+            }
+        }
+    });
+    
+    // Then fill in with regular random events if needed
+    const targetEventCount = 1 + Math.floor(Math.random() * 2); // 1-2 events total
+    while (events.length < targetEventCount) {
+        const randomEvent = generateRandomEvent(townInfo, npcs, storyConsequences);
+        if (randomEvent) {
+            events.push(randomEvent);
+        } else {
+            break; // Couldn't generate more events
+        }
+    }
+    
+    return events;
+}
+
+function generateEventFromSeed(seed, townInfo, npcs, storyConsequences) {
+    console.log(`Attempting to generate event from seed:`, seed);
+    
+    if (seed.type === 'character_focus') {
+        return generateCharacterFocusEvent(seed, townInfo, npcs, storyConsequences);
+    } else if (seed.type === 'thematic_influence') {
+        return generateThematicEvent(seed, townInfo, npcs, storyConsequences);
+    } else if (seed.type === 'location_focus') {
+        return generateLocationEvent(seed, townInfo, npcs, storyConsequences);
+    } else if (seed.type === 'fiction_influence') {
+        return generateFictionInspiredEvent(seed, townInfo, npcs, storyConsequences);
+    } else if (seed.type === 'truth_influence') {
+        return generateTruthInspiredEvent(seed, townInfo, npcs, storyConsequences);
+    }
+    
+    return null;
+}
+
+function generateCharacterFocusEvent(seed, townInfo, npcs, storyConsequences) {
+    const targetNPC = npcs.find(npc => npc.name === seed.target);
+    if (!targetNPC) return null;
+    
+    const eventTemplates = {
+        career_change: {
+            title: `${targetNPC.name} Embraces Change`,
+            description: `Inspired by your recent story about them, ${targetNPC.name} has decided to make a major life change. They're leaving their role as a ${targetNPC.character.profession} to pursue new opportunities.`,
+            effects: () => {
+                const newProfessions = ['Merchant', 'Guard', 'Farmer', 'Priest', 'Doctor', 'Scholar', 'Artisan'];
+                const newProfession = randomChoice(newProfessions.filter(p => p !== targetNPC.character.profession));
+                targetNPC.character.profession = newProfession;
+                if (gameState.knownCharacters[targetNPC.name]) {
+                    gameState.knownCharacters[targetNPC.name].character.profession = newProfession;
+                }
+            }
+        },
+        
+        personal_growth: {
+            title: `${targetNPC.name} Finds New Purpose`,
+            description: `Your story about ${targetNPC.name} has resonated deeply with them. They've been seen around town with a new sense of confidence and purpose, taking on responsibilities they never would have before.`,
+            effects: () => {
+                if (targetNPC.character.psychologicalProfile) {
+                    targetNPC.character.psychologicalProfile.emotionalState = 'inspired';
+                }
+                // Improve relationship with player if they know this character
+                if (gameState.knownCharacters[targetNPC.name]) {
+                    const char = gameState.knownCharacters[targetNPC.name];
+                    if (char.relationshipLevel === 'acquaintance') {
+                        char.relationshipLevel = 'friend';
+                    }
+                }
+            }
+        },
+        
+        relationship_change: {
+            title: `${targetNPC.name} Reaches Out`,
+            description: `Moved by the themes in your story, ${targetNPC.name} has decided to mend a strained relationship. They were seen reconciling with someone they hadn't spoken to in months.`,
+            effects: () => {
+                // Find and improve a relationship
+                if (targetNPC.character.relationships) {
+                    const strainedRels = targetNPC.character.relationships.filter(rel => rel.quality === 'hostile');
+                    if (strainedRels.length > 0) {
+                        const rel = randomChoice(strainedRels);
+                        rel.quality = 'neutral';
+                        rel.intensity = Math.min(5, rel.intensity + 1);
+                    }
+                }
+            }
+        }
+    };
+    
+    const eventType = randomChoice(seed.eventTypes.filter(type => eventTemplates[type]));
+    if (!eventType) return null;
+    
+    const template = eventTemplates[eventType];
+    
+    return {
+        type: 'consequence',
+        title: template.title,
+        description: template.description,
+        characters: [targetNPC.name],
+        effects: template.effects,
+        seed: seed
+    };
+}
+
+function generateThematicEvent(seed, townInfo, npcs, storyConsequences) {
+    const themeTemplates = {
+        economic: {
+            trade_opportunity: {
+                title: 'New Business Venture',
+                description: `Inspired by the economic themes in your recent story, several townspeople have banded together to start a new business venture. The community is buzzing with entrepreneurial energy.`,
+                effects: () => {
+                    gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight - 1);
+                    // Boost merchant NPCs
+                    npcs.forEach(npc => {
+                        if (npc.character.profession.toLowerCase().includes('merchant') && npc.character.psychologicalProfile) {
+                            npc.character.psychologicalProfile.emotionalState = 'optimistic';
+                        }
+                    });
+                }
+            }
+        },
+        
+        mystery: {
+            mystery_resolution: {
+                title: 'Old Mystery Solved',
+                description: `Your storytelling about mysterious events has inspired someone to come forward with information about an old town mystery. A long-standing question has finally been answered.`,
+                effects: () => {
+                    // Convert an old rumor to confirmed
+                    if (gameState.townStoryState?.elements) {
+                        const rumors = gameState.townStoryState.elements.filter(e => e.currentType === 'rumored');
+                        if (rumors.length > 0) {
+                            const resolvedRumor = randomChoice(rumors);
+                            resolvedRumor.currentType = 'confirmed';
+                            resolvedRumor.evolutionHistory.push(`Day ${gameState.day}: Mystery resolved through storytelling inspiration`);
+                        }
+                    }
+                }
+            }
+        },
+        
+        relationship: {
+            social_gathering: {
+                title: 'Community Comes Together',
+                description: `The relationship themes in your story have inspired the townspeople to organize a community gathering. People who rarely speak to each other are finding common ground.`,
+                effects: () => {
+                    // Improve random relationships
+                    npcs.forEach(npc => {
+                        if (Math.random() < 0.3 && npc.character.relationships) {
+                            const neutralRels = npc.character.relationships.filter(rel => rel.quality === 'neutral');
+                            if (neutralRels.length > 0) {
+                                const rel = randomChoice(neutralRels);
+                                rel.quality = 'positive';
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    };
+    
+    const themeData = themeTemplates[seed.theme];
+    if (!themeData) return null;
+    
+    const eventType = randomChoice(seed.eventTypes.filter(type => themeData[type]));
+    if (!eventType || !themeData[eventType]) return null;
+    
+    const template = themeData[eventType];
+    
+    return {
+        type: seed.theme === 'economic' ? 'economic' : seed.theme === 'mystery' ? 'mystery' : 'social',
+        title: template.title,
+        description: template.description,
+        characters: [],
+        effects: template.effects,
+        seed: seed
+    };
+}
+
+function generateLocationEvent(seed, townInfo, npcs, storyConsequences) {
+    return {
+        type: 'town',
+        title: `Changes at the ${seed.target}`,
+        description: `Your story featuring the ${seed.target} has sparked interest in that location. People are paying more attention to what happens there, and some are even suggesting improvements.`,
+        characters: [],
+        effects: () => {
+            // Find NPCs associated with this location and boost their mood
+            npcs.forEach(npc => {
+                if (npc.location && locations[npc.location] && 
+                    locations[npc.location].name && 
+                    locations[npc.location].name.toLowerCase().includes(seed.target.toLowerCase())) {
+                    if (npc.character.psychologicalProfile) {
+                        npc.character.psychologicalProfile.emotionalState = 'proud';
+                    }
+                }
+            });
+        },
+        seed: seed
+    };
+}
+
+function generateFictionInspiredEvent(seed, townInfo, npcs, storyConsequences) {
+    const mysteries = [
+        {
+            title: 'Life Imitates Art',
+            description: `Strangely, elements from your fictional story seem to be manifesting in real life. Several townspeople report experiences similar to what you described in your tale.`,
+            rumor: "The bard's fictional story seems to be coming true in mysterious ways"
+        },
+        {
+            title: 'Inspired Imagination',
+            description: `Your creative storytelling has sparked the imagination of the townspeople. Children are playing games based on your story, and adults are discussing what they would do in similar situations.`,
+            rumor: "The whole town is talking about the bard's incredible tale"
+        }
+    ];
+    
+    const mystery = randomChoice(mysteries);
+    return {
+        type: 'mystery',
+        title: mystery.title,
+        description: mystery.description,
+        characters: [],
+        effects: () => {
+            if (gameState.townStoryState?.elements) {
+                gameState.townStoryState.elements.push({
+                    id: `fiction_rumor_${Date.now()}_${Math.random()}`,
+                    originalText: mystery.rumor,
+                    originalType: 'rumored',
+                    currentType: 'rumored',
+                    category: 'fiction_inspired',
+                    dayAdded: gameState.day,
+                    evolutionHistory: [`Day ${gameState.day}: Rumor inspired by fictional storytelling`]
+                });
+            }
+        },
+        seed: seed
+    };
+}
+
+function generateTruthInspiredEvent(seed, townInfo, npcs, storyConsequences) {
+    return {
+        type: 'consequence',
+        title: 'Truth Sparks Action',
+        description: `Your truthful storytelling has motivated people to take practical action. Several townspeople have formed a committee to address the real issues you highlighted in your story.`,
+        characters: [],
+        effects: () => {
+            // Slightly improve town conditions
+            if (Math.random() < 0.5) {
+                gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight - 1);
+            }
+            
+            // Create a positive rumor about community action
+            if (gameState.townStoryState?.elements) {
+                gameState.townStoryState.elements.push({
+                    id: `action_rumor_${Date.now()}_${Math.random()}`,
+                    originalText: "The townspeople have organized to solve real problems facing the community",
+                    originalType: 'confirmed',
+                    currentType: 'confirmed',
+                    category: 'community_action',
+                    dayAdded: gameState.day,
+                    evolutionHistory: [`Day ${gameState.day}: Community action inspired by truthful storytelling`]
+                });
+            }
+        },
+        seed: seed
+    };
+}
+
+function generateRandomEvent(townInfo, npcs, storyConsequences) {
+    // Fallback to original random event generation
+    const oldEvents = generateNightlyEvents(townInfo, npcs, storyConsequences);
+    return oldEvents.length > 0 ? oldEvents[0] : null;
+}
+
+// Event Log System
+function addToEventLog(event) {
+    if (!gameState.eventLog) {
+        gameState.eventLog = [];
+    }
+    
+    const logEntry = {
+        id: `event_${Date.now()}_${Math.random()}`,
+        day: gameState.day,
+        townName: locations.townInfo ? locations.townInfo.name : 'Unknown Town',
+        townNumber: gameState.townNumber,
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: event.characters || [],
+        timestamp: new Date().toLocaleString(),
+        storyInspired: event.seed ? true : false,
+        seedReason: event.seed ? event.seed.reason : null
+    };
+    
+    gameState.eventLog.unshift(logEntry); // Add to beginning for reverse chronological order
+    
+    // Keep only last 100 events to prevent memory issues
+    if (gameState.eventLog.length > 100) {
+        gameState.eventLog = gameState.eventLog.slice(0, 100);
+    }
+}
+
+function updateEventLogDisplay(filter = 'all') {
+    const eventLogDisplay = document.getElementById('event-log-display');
+    if (!eventLogDisplay) return;
+    
+    // Update active seeds display
+    updateActiveSeedsDisplay();
+    
+    const eventLog = gameState.eventLog || [];
+    let filteredEvents = eventLog;
+    
+    if (filter === 'story-inspired') {
+        filteredEvents = eventLog.filter(event => event.storyInspired);
+    } else if (filter !== 'all') {
+        filteredEvents = eventLog.filter(event => event.type === filter);
+    }
+    
+    if (filteredEvents.length === 0) {
+        const noEventsMessage = filter === 'story-inspired' 
+            ? 'No story-inspired events yet. Tell more stories and watch as your tales shape the world around you!'
+            : 'No events have been recorded yet. Begin your story and watch as the world comes alive around you!';
+        eventLogDisplay.innerHTML = `<p style="color: #999; font-style: italic; text-align: center; margin-top: 40px;">${noEventsMessage}</p>`;
+        return;
+    }
+    
+    let html = '';
+    let lastDay = null;
+    let lastTown = null;
+    
+    filteredEvents.forEach(event => {
+        // Add day/town separator
+        if (lastDay !== event.day || lastTown !== event.townName) {
+            html += `
+                <div class="event-day-separator" style="background: rgba(218, 165, 32, 0.2); border: 1px solid #daa520; border-radius: 5px; padding: 8px; margin: 15px 0 10px 0; text-align: center; font-weight: bold; color: #daa520;">
+                    📅 Day ${event.day} - ${event.townName} (Town ${event.townNumber})
+                </div>
+            `;
+            lastDay = event.day;
+            lastTown = event.townName;
+        }
+        
+        const eventType = eventTypes[event.type] || {
+            name: event.type,
+            icon: "❓",
+            color: "#999"
+        };
+        
+        html += `
+            <div class="event-log-entry" style="background: rgba(139, 69, 19, 0.2); border-left: 4px solid ${eventType.color}; padding: 12px; margin: 8px 0; border-radius: 0 5px 5px 0;">
+                <div class="event-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div class="event-type" style="color: ${eventType.color}; font-weight: bold; font-size: 0.9em;">
+                        ${eventType.icon} ${eventType.name}
+                    </div>
+                    <div class="event-time" style="color: #999; font-size: 0.8em;">
+                        ${event.timestamp}
+                    </div>
+                </div>
+                <div class="event-title" style="font-weight: bold; color: #f4e4c1; margin-bottom: 5px;">
+                    ${event.title}
+                </div>
+                <div class="event-description" style="color: #ddd; line-height: 1.4; margin-bottom: 8px;">
+                    ${event.description}
+                </div>
+                ${event.storyInspired ? `
+                    <div class="story-inspiration" style="font-size: 0.8em; color: #ff6347; font-style: italic; margin-bottom: 5px;">
+                        📚 Story-Inspired: ${event.seedReason}
+                    </div>
+                ` : ''}
+                ${event.characters.length > 0 ? `
+                    <div class="event-characters" style="font-size: 0.8em; color: #daa520;">
+                        👥 Characters involved: ${event.characters.join(', ')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    eventLogDisplay.innerHTML = html;
+}
+
+function updateActiveSeedsDisplay() {
+    const seedsDisplay = document.getElementById('current-seeds-display');
+    const seedsList = document.getElementById('seeds-list');
+    if (!seedsDisplay || !seedsList) return;
+    
+    const activeSeeds = gameState.eventSeeds || [];
+    
+    if (activeSeeds.length === 0) {
+        seedsDisplay.style.display = 'none';
+        return;
+    }
+    
+    seedsDisplay.style.display = 'block';
+    
+    let seedsHTML = '';
+    activeSeeds.forEach(seed => {
+        const daysLeft = seed.expiresDay - gameState.day;
+        seedsHTML += `
+            <div style="background: rgba(255, 99, 71, 0.1); border-left: 3px solid #ff6347; padding: 8px; margin: 5px 0; border-radius: 0 4px 4px 0;">
+                <div style="font-size: 0.85em; color: #ff6347; font-weight: bold;">${seed.reason}</div>
+                <div style="font-size: 0.8em; color: #ccc; margin-top: 3px;">
+                    May influence: ${seed.eventTypes.join(', ')} • Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    seedsList.innerHTML = seedsHTML;
+}
+
+function filterEvents(filterType) {
+    // Update filter button states
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-filter="${filterType}"]`).classList.add('active');
+    
+    // Update display
+    updateEventLogDisplay(filterType);
+}
 
 // Town/City Generation Data
 const townGen = {
@@ -98,8 +1492,278 @@ const townGen = {
             adjectives: ['Town', 'City', 'Council', 'Guild', 'Mayors\'', 'Royal', 'Municipal', 'Civic', 'Public', 'Official'],
             nouns: ['Council', 'Guild', 'Court', 'Assembly', 'Chamber', 'Office', 'Authority', 'Registry', 'Bureau', 'Department'],
             nouns2: ['Hall', 'House', 'Building', 'Chambers', 'Offices', 'Complex', 'Center', 'Plaza', 'Square', 'District']
+        },
+        lighthouse: {
+            names: ['The {adjective} Lighthouse', '{adjective} {noun} Beacon', '{noun} Point'],
+            adjectives: ['Stormy', 'Lonely', 'Windswept', 'Beacon', 'Old', 'Tall', 'Shining', 'Silent', 'Rocky', 'Distant'],
+            nouns: ['Cliff', 'Rock', 'Light', 'Tower', 'Point', 'Cove', 'Bay', 'Harbor', 'Cape', 'Lantern']
+        },
+        graveyard: {
+            names: ['{adjective} {noun} Cemetery', '{adjective} {noun} Graveyard', '{noun} Rest'],
+            adjectives: ['Silent', 'Old', 'Shadowed', 'Peaceful', 'Forgotten', 'Sacred', 'Misty', 'Ancient', 'Lonely', 'Hallowed'],
+            nouns: ['Oak', 'Willow', 'Stone', 'Hill', 'Cross', 'Vale', 'Field', 'Garden', 'Path', 'Gate']
+        },
+        school: {
+            names: ['{adjective} School', '{noun} Academy', '{adjective} {noun} Institute'],
+            adjectives: ['Bright', 'Old', 'Modern', 'Scholarly', 'Quiet', 'Bustling', 'Respected', 'Public', 'Private', 'Community'],
+            nouns: ['Learning', 'Knowledge', 'Hope', 'Future', 'Wisdom', 'Scholars', 'Teachers', 'Students', 'Oak', 'Maple']
         }
     }
+};
+
+// Character Backstory Generation System - Enhanced like Dwarf Fortress
+const backstoryGen = {
+    // Life-shaping events that create depth and motivation
+    majorLifeEvents: {
+        childhood: [
+            {
+                event: "Lost a parent in the mine collapse",
+                effects: { grief: 3, distrust_authority: 2, protective_instinct: 2 },
+                connections: ["mine_accident_survivors", "single_parent_families"]
+            },
+            {
+                event: "Grew up as an orphan, raised by the community",
+                effects: { independence: 3, social_bonds: 2, abandonment_fear: 1 },
+                connections: ["community_raised", "orphans"]
+            },
+            {
+                event: "Child of a disgraced former mayor", 
+                effects: { political_awareness: 3, shame: 2, redemption_drive: 2 },
+                connections: ["political_families", "fallen_nobility"]
+            },
+            {
+                event: "Survived a terrible fire that destroyed their family home",
+                effects: { trauma: 2, resilience: 3, material_detachment: 2 },
+                connections: ["disaster_survivors", "fire_victims"]
+            },
+            {
+                event: "Born during a miraculous harvest after years of famine",
+                effects: { optimism: 3, spiritual_connection: 2, community_pride: 2 },
+                connections: ["miracle_generation", "blessed_children"]
+            }
+        ],
+        adolescence: [
+            {
+                event: "Fell in love with someone from a rival family",
+                effects: { forbidden_love: 3, defiance: 2, heartbreak: 1 },
+                connections: ["star_crossed_lovers", "family_feuds"]
+            },
+            {
+                event: "Apprenticed under a harsh but skilled master",
+                effects: { work_ethic: 3, authority_issues: 2, perfectionism: 2 },
+                connections: ["master_craftspeople", "harsh_teachers"]
+            },
+            {
+                event: "Discovered a natural talent that changed their life path",
+                effects: { confidence: 3, artistic_soul: 2, pressure: 1 },
+                connections: ["talented_individuals", "gifted_artisans"]
+            },
+            {
+                event: "Witnessed a terrible injustice they couldn't stop",
+                effects: { justice_obsession: 3, helplessness: 2, activism: 2 },
+                connections: ["injustice_witnesses", "future_activists"]
+            }
+        ],
+        adulthood: [
+            {
+                event: "Lost their spouse in an accident",
+                effects: { grief: 4, loneliness: 3, protective_instinct: 2 },
+                connections: ["widowed", "tragic_losses", "accident_victims"]
+            },
+            {
+                event: "Successfully defended the town during bandit raids",
+                effects: { heroism: 3, combat_experience: 3, responsibility: 2 },
+                connections: ["town_defenders", "war_heroes", "militia_veterans"]
+            },
+            {
+                event: "Built a successful business from nothing",
+                effects: { entrepreneurship: 3, self_reliance: 2, wealth_anxiety: 1 },
+                connections: ["self_made", "business_founders", "success_stories"]
+            },
+            {
+                event: "Took care of aging parents for years",
+                effects: { duty: 3, patience: 2, sacrifice: 2 },
+                connections: ["caregivers", "dutiful_children", "family_burden"]
+            }
+        ]
+    },
+
+    // Personality traits with depth and nuance
+    personalityTraits: {
+        primary: [
+            { trait: "Stalwart Protector", description: "Puts community safety above all else", motivations: ["protect others", "maintain order"], fears: ["letting people down", "chaos"] },
+            { trait: "Curious Scholar", description: "Driven to understand and learn", motivations: ["discover truth", "share knowledge"], fears: ["ignorance", "being proven wrong"] },
+            { trait: "Wounded Healer", description: "Helps others while nursing their own pain", motivations: ["ease suffering", "find meaning"], fears: ["own vulnerability", "failing to help"] },
+            { trait: "Ambitious Climber", description: "Seeks to rise above their station", motivations: ["gain power", "prove worth"], fears: ["remaining nobody", "humiliation"] },
+            { trait: "Gentle Nurturer", description: "Finds joy in caring for others", motivations: ["create harmony", "help people grow"], fears: ["conflict", "causing harm"] },
+            { trait: "Restless Wanderer", description: "Feels trapped by routine and expectations", motivations: ["explore unknown", "find freedom"], fears: ["being caged", "missing out"] },
+            { trait: "Dutiful Traditionalist", description: "Believes in the old ways and proper order", motivations: ["preserve traditions", "maintain respect"], fears: ["change", "social chaos"] },
+            { trait: "Passionate Revolutionary", description: "Burns to change what they see as wrong", motivations: ["fight injustice", "create change"], fears: ["oppression", "compromise"] }
+        ],
+        secondary: [
+            "Quick wit and sharp tongue",
+            "Deep empathy for outcasts",
+            "Perfectionist tendencies",
+            "Natural leadership qualities", 
+            "Artistic and creative nature",
+            "Strong sense of justice",
+            "Tendency toward melancholy",
+            "Infectious optimism",
+            "Stubborn independence",
+            "Fierce loyalty to friends"
+        ]
+    },
+
+    // Family and social connections
+    familyStructures: {
+        types: [
+            {
+                type: "Large Extended Family",
+                members: ["parents", "siblings", "aunts", "uncles", "cousins", "grandparents"],
+                dynamics: "Close-knit clan with strong traditions and mutual support",
+                secrets: ["family_feuds", "inherited_debts", "hidden_talents"]
+            },
+            {
+                type: "Nuclear Family", 
+                members: ["spouse", "children"],
+                dynamics: "Self-reliant family unit focused on their own prosperity",
+                secrets: ["marital_problems", "child_concerns", "financial_stress"]
+            },
+            {
+                type: "Broken Family",
+                members: ["estranged_siblings", "absent_parent", "step_relations"],
+                dynamics: "Complicated relationships with unresolved tensions",
+                secrets: ["family_shame", "abandonment_issues", "custody_battles"]
+            },
+            {
+                type: "Chosen Family",
+                members: ["close_friends", "mentor_figures", "adopted_kin"],
+                dynamics: "Bonds forged by choice rather than blood",
+                secrets: ["past_traumas", "shared_adventures", "mutual_obligations"]
+            }
+        ]
+    },
+
+    // Skills and talents that add depth
+    skills: [
+        { skill: "Master craftsperson", description: "Creates items of exceptional quality", social_status: 3 },
+        { skill: "Gifted storyteller", description: "Can captivate any audience", social_status: 2 },
+        { skill: "Healing knowledge", description: "Knows herbs and medical techniques", social_status: 2 },
+        { skill: "Combat veteran", description: "Experienced in warfare and tactics", social_status: 2 },
+        { skill: "Natural diplomat", description: "Can navigate complex social situations", social_status: 3 },
+        { skill: "Keen investigator", description: "Excellent at uncovering secrets", social_status: 1 },
+        { skill: "Spiritual advisor", description: "Provides guidance and comfort", social_status: 3 },
+        { skill: "Economic mind", description: "Understands trade and finance", social_status: 2 }
+    ],
+
+    // Flaws and vulnerabilities that make characters human
+    flaws: [
+        { flaw: "Quick to anger", description: "Explosive temper that creates conflicts", consequences: "damaged_relationships" },
+        { flaw: "Chronic worrier", description: "Anxiety about everything that could go wrong", consequences: "decision_paralysis" },
+        { flaw: "Pride and arrogance", description: "Unwilling to admit mistakes or weakness", consequences: "isolated_leadership" },
+        { flaw: "Addictive personality", description: "Struggles with alcohol, gambling, or other vices", consequences: "unreliable_behavior" },
+        { flaw: "Overly trusting", description: "Believes the best in people despite evidence", consequences: "repeated_betrayals" },
+        { flaw: "Secretive nature", description: "Keeps too much hidden from others", consequences: "mysterious_reputation" },
+        { flaw: "Perfectionist paralysis", description: "Cannot act until conditions are perfect", consequences: "missed_opportunities" },
+        { flaw: "Jealous tendencies", description: "Envious of others' success and happiness", consequences: "social_conflicts" }
+    ],
+
+    // Current life situations and goals
+    currentSituations: [
+        {
+            situation: "Caring for a sick family member",
+            stress_level: 3,
+            time_commitment: "high",
+            motivations: ["find_cure", "manage_costs", "get_support"]
+        },
+        {
+            situation: "Planning to start their own business",
+            stress_level: 2,
+            time_commitment: "medium", 
+            motivations: ["save_money", "learn_skills", "find_partners"]
+        },
+        {
+            situation: "In a secret romantic relationship",
+            stress_level: 2,
+            time_commitment: "low",
+            motivations: ["maintain_secrecy", "advance_relationship", "resolve_obstacles"]
+        },
+        {
+            situation: "Investigating corruption in local government",
+            stress_level: 3,
+            time_commitment: "high",
+            motivations: ["gather_evidence", "find_allies", "ensure_safety"]
+        },
+        {
+            situation: "Training an apprentice or successor",
+            stress_level: 1,
+            time_commitment: "medium",
+            motivations: ["pass_on_knowledge", "ensure_quality", "prepare_retirement"]
+        }
+    ]
+};
+
+// Relationship Generation System
+const relationshipGen = {
+    relationshipTypes: [
+        // Family relationships
+        { type: "parent", intensity: 4, description: "Parent-child bond with all its complexities" },
+        { type: "child", intensity: 4, description: "Their beloved or troubled offspring" },
+        { type: "spouse", intensity: 4, description: "Life partner sharing joys and struggles" },
+        { type: "sibling", intensity: 3, description: "Brother or sister with shared history" },
+        { type: "extended_family", intensity: 2, description: "Cousin, aunt, uncle, or in-law" },
+        
+        // Professional relationships  
+        { type: "business_partner", intensity: 3, description: "Shares financial interests and risks" },
+        { type: "mentor", intensity: 3, description: "Taught them important life skills" },
+        { type: "apprentice", intensity: 3, description: "Learning from them or under their guidance" },
+        { type: "colleague", intensity: 2, description: "Works in similar profession or location" },
+        { type: "competitor", intensity: 2, description: "Rivalry over customers or resources" },
+        
+        // Social relationships
+        { type: "best_friend", intensity: 4, description: "Closest confidant who knows their secrets" },
+        { type: "close_friend", intensity: 3, description: "Regular companion and trusted ally" },
+        { type: "neighbor", intensity: 2, description: "Lives nearby with regular interaction" },
+        { type: "acquaintance", intensity: 1, description: "Known casually through community" },
+        
+        // Romantic relationships
+        { type: "secret_lover", intensity: 4, description: "Hidden romantic relationship" },
+        { type: "former_lover", intensity: 3, description: "Past romantic partner with lingering feelings" },
+        { type: "unrequited_love", intensity: 3, description: "One-sided romantic feelings" },
+        
+        // Antagonistic relationships
+        { type: "enemy", intensity: 4, description: "Active hatred and opposition" },
+        { type: "rival", intensity: 3, description: "Competitive antagonism" },
+        { type: "victim", intensity: 2, description: "Someone they wronged in the past" },
+        { type: "oppressor", intensity: 3, description: "Someone who has power over them" },
+        
+        // Unique relationships
+        { type: "creditor", intensity: 2, description: "Owes them money or favors" },
+        { type: "debtor", intensity: 2, description: "They owe money or favors" },
+        { type: "witness", intensity: 2, description: "Knows their secrets or witnessed events" },
+        { type: "protege", intensity: 3, description: "Someone they're guiding or sponsoring" }
+    ],
+
+    relationshipQualities: [
+        "respectful", "tense", "loving", "competitive", "supportive", "jealous", 
+        "protective", "dependent", "suspicious", "trusting", "complicated", "growing",
+        "declining", "stable", "passionate", "practical", "spiritual", "conflicted"
+    ],
+
+    relationshipHistory: [
+        "They grew up together as children",
+        "Met during a crisis that bonded them",
+        "Worked together on an important project",
+        "One helped the other through a difficult time", 
+        "They discovered a shared secret",
+        "Had a major disagreement that still affects them",
+        "Were once lovers but now are friends",
+        "One saved the other's life",
+        "They share a mutual enemy or rival",
+        "Connected through a third party who's now gone",
+        "Bound by a promise or oath they made",
+        "One knows something the other needs to keep hidden"
+    ]
 };
 
 // Character Generation Data
@@ -140,83 +1804,27 @@ const storyElementsByTownType = {
         primaryTragedy: {
             type: 'confirmed',
             texts: [
-                'The old mine was sealed five years ago after a cave-in killed three miners',
-                'Three people died in the mine accident and it was deemed too dangerous to reopen',
-                'The mine closure was officially due to safety concerns after the fatal accident'
+                'Five years back, the mountain groaned and the old mine collapsed, burying three souls and the town\'s prosperity with them.',
+                'The official record says the mine was sealed for safety after the accident, but the earth still holds its secrets.',
+                'A cave-in claimed three miners\' lives half a decade ago, and the town has never quite recovered from the loss.'
             ]
         },
         mysteryRumors: {
             type: 'rumored',
             texts: [
-                'Strange sounds were heard from the mine before the accident',
-                'Some say the mine accident wasn\'t really an accident',
-                'Locals claim to still hear sounds from the sealed mine at night',
-                'The mine held more than just ore - there were discoveries the town wants hidden'
+                'They say the miners weren\'t digging for ore, but for something ancient that should have been left undisturbed.',
+                'Just before the collapse, folks heard unnatural echoes from the deep, like the mountain itself was whispering warnings.',
+                'Some swear the accident was no accident at all, but a cover-up for a discovery too terrible to reveal.',
+                'On moonless nights, people claim to hear faint tapping from behind the sealed mine entrance... a sound of something wanting out.'
             ]
         },
         economicImpact: {
             type: 'confirmed',
             texts: [
-                'Trade has decreased significantly since the mine closure',
-                'The mine was the source of the town\'s former prosperity',
-                'Business has been slow since fewer traders come through town',
-                'Many families have struggled financially since the mine closed'
-            ]
-        }
-    },
-    trading: {
-        primaryTragedy: {
-            type: 'confirmed',
-            texts: [
-                'The main trade route was blocked by bandits five years ago',
-                'A plague wiped out a merchant caravan, causing trade routes to shift',
-                'The river changed course, making the docks unusable for large ships'
-            ]
-        },
-        mysteryRumors: {
-            type: 'rumored',
-            texts: [
-                'The merchant guild is hiding the real reason trade has declined',
-                'Strange ships have been seen on the river at night',
-                'Some say the rival trading post is using underhanded tactics',
-                'There are whispers of a secret trade war with neighboring regions'
-            ]
-        },
-        economicImpact: {
-            type: 'confirmed',
-            texts: [
-                'Many trading families have lost their livelihoods',
-                'The market stalls are half empty compared to previous years',
-                'Prices have increased due to reduced supply chains',
-                'Young people are leaving to find opportunities in other cities'
-            ]
-        }
-    },
-    farming: {
-        primaryTragedy: {
-            type: 'confirmed',
-            texts: [
-                'Three seasons of crop failures have devastated the community',
-                'A disease killed most of the livestock two years ago',
-                'The great storm destroyed the communal grain stores'
-            ]
-        },
-        mysteryRumors: {
-            type: 'rumored',
-            texts: [
-                'The soil has been cursed by something buried beneath the fields',
-                'Strange weather patterns aren\'t natural - someone is causing them',
-                'The old hermit knows secrets about restoring the land\'s fertility',
-                'There are ancient standing stones that control the seasons'
-            ]
-        },
-        economicImpact: {
-            type: 'confirmed',
-            texts: [
-                'Many farming families have had to sell their land',
-                'The harvest festivals haven\'t been held in three years',
-                'Food has to be imported from distant regions at great cost',
-                'The younger generation is abandoning farming for other trades'
+                'The old trade road is quieter now; the mine was the town\'s heartbeat, and its pulse is faint.',
+                'With the mine gone, the town\'s wealth has dried up, leaving a fine dust of poverty on everything.',
+                'The shimmer of rare minerals once brought merchants from afar, but now their wagons bypass us on their way to richer lands.',
+                'Hope is a currency scarcer than coin since the mine was lost.'
             ]
         }
     },
@@ -224,27 +1832,55 @@ const storyElementsByTownType = {
         primaryTragedy: {
             type: 'confirmed',
             texts: [
-                'A great storm destroyed the fishing fleet five years ago',
-                'The fish disappeared from the bay after the strange red tide',
-                'Pirates attacked the harbor, burning the docks and many ships'
+                'A decade ago, a storm of unnatural fury swallowed half the fishing fleet, leaving a generation of widows and fatherless sons.',
+                'The legendary lighthouse, once the town\'s pride, has been dark for years, a silent monument to a forgotten tragedy.',
+                'The sea gives, but it also takes. The Great Storm of yesteryear took more than its share of ships and souls.'
             ]
         },
         mysteryRumors: {
             type: 'rumored',
             texts: [
-                'Sea monsters have been driving the fish away from the coast',
-                'The lighthouse keeper disappeared on the night of the great storm',
-                'Strange lights have been seen beneath the waves',
-                'The old sea charts show islands that no longer exist'
+                'They say the old lighthouse keeper didn\'t fall; he was pushed by a rival who coveted his post.',
+                'Some sailors claim to see a phantom ship on the horizon during storms, a vessel that never makes it to port.',
+                'Whispers in the tavern suggest a cursed treasure was brought ashore, dooming the fleet that found it.',
+                'The fog that rolls in from the sea isn\'t natural. It carries whispers, and sometimes, it doesn\'t recede alone.'
             ]
         },
         economicImpact: {
             type: 'confirmed',
             texts: [
-                'Most fishing families now work as laborers or farmers',
-                'The shipbuilding trade has completely collapsed',
-                'Trade with other coastal towns has been severely reduced',
-                'Many experienced sailors have left to find work elsewhere'
+                'The fish markets, once overflowing, now offer only meager catches. The sea grows stingy.',
+                'Shipwrights and sailmakers have little work, their skills a relic of a more prosperous time.',
+                'The town survives on salted fish and patched nets, a shadow of its former, bountiful self.',
+                'Young folk look to the roads for their future, not the waves. The sea has lost its allure.'
+            ]
+        }
+    },
+    agricultural: {
+        primaryTragedy: {
+            type: 'confirmed',
+            texts: [
+                'A prolonged drought years ago turned the once-fertile fields to dust, and the scars on the land remain.',
+                'A blight of unknown origin wiped out the heirloom crops, leaving the town dependent on less reliable harvests.',
+                'The river that once nourished the valley shifted its course, leaving the most fertile lands high and dry.'
+            ]
+        },
+        mysteryRumors: {
+            type: 'rumored',
+            texts: [
+                'Some say the old landowner who lost his farm to the drought cursed the land with his dying breath.',
+                'They whisper that the blight wasn\'t natural, but sabotage from a rival farming community.',
+                'Children tell tales of strange, scarecrow-like figures seen walking the barren fields at twilight.',
+                'The river didn\'t move on its own. Something downstream blocked its path for reasons no one understands.'
+            ]
+        },
+        economicImpact: {
+            type: 'confirmed',
+            texts: [
+                'The grain silo is rarely full, a hollow monument to a time of plenty.',
+                'The town\'s famous ciders and breads are now just memories, the unique ingredients lost to time.',
+                'Farmers struggle with new, unfamiliar crops that fetch a lower price at market.',
+                'The annual harvest festival is a somber affair, a reminder of what\'s been lost rather than a celebration.'
             ]
         }
     }
@@ -255,28 +1891,28 @@ const universalStoryElements = {
     mayorSecrets: {
         type: 'rumored',
         texts: [
-            'The mayor has been meeting with mysterious visitors from the capital',
-            'The mayor is secretive about new economic plans for the town',
-            'There are rumors the mayor is making deals that will change the town forever',
-            'Some suspect the mayor knows more about the local troubles than they admit'
+            'The Mayor entertains well-dressed strangers from the capital. They arrive after dark and leave before dawn.',
+            'A new tax is coming, they whisper. One that will benefit the Mayor\'s friends and cripple the common folk.',
+            'The Mayor speaks of progress, but some say they\'re selling off the town\'s future piece by piece to an outside power.',
+            'The town\'s charter, which grants its rights and freedoms, has gone missing from the Mayor\'s office.'
         ]
     },
     personalStories: {
         type: 'confirmed',
         texts: [
-            'Several young people have been talking about leaving town lately',
-            'Some residents are considering moving to better opportunities',
-            'A few families are worried about their children\'s future here',
-            'Local craftsmen are struggling to find steady work'
+            'The blacksmith\'s daughter has a secret suitor, one her father would never approve of.',
+            'The old weaver is going blind, and with her failing eyes goes the secret of the town\'s traditional patterns.',
+            'A feud between two prominent families, once a low simmer, is about to boil over into public conflict.',
+            'The innkeeper\'s son dreams of being an adventurer, a dangerous ambition in a town that clings to safety.'
         ]
     },
     socialTension: {
         type: 'rumored',
         texts: [
-            'There\'s growing tension between the old families and newcomers',
-            'Some people blame outsiders for the town\'s recent problems',
-            'The wealthy merchants seem unaffected by everyone else\'s struggles',
-            'People whisper about old grudges and settling scores'
+            'The guards are cracking down on \'sedition,\' but it seems they\'re only silencing those who question the Mayor\'s authority.',
+            'There\'s a growing divide between those who cling to the old ways and those who demand change, a rift that could tear the town apart.',
+            'The wealthy merchants are hoarding grain, waiting for the prices to rise as the common folk go hungry.',
+            'A charismatic newcomer is gaining a following, preaching a message of rebellion that is as tempting as it is dangerous.'
         ]
     }
 };
@@ -311,6 +1947,11 @@ function generateTownName() {
 
 function generateLocationName(locationType) {
     const locationData = townGen.locationTypes[locationType];
+    if (!locationData) {
+        console.warn(`No location data found for type: ${locationType}`);
+        return `Generic ${locationType}`;
+    }
+    
     const template = randomChoice(locationData.names);
     const adjective = randomChoice(locationData.adjectives);
     const noun = randomChoice(locationData.nouns);
@@ -388,26 +2029,670 @@ function generateCharacter(locationKey) {
     // Get appropriate professions for this location type
     const availableProfessions = characterGen.professions[locationKey] || characterGen.professions['tavern'];
     const profession = randomChoice(availableProfessions);
-    const personality = randomChoice(characterGen.personalities);
     const age = randomChoice(characterGen.ages);
     const appearance = randomChoice(characterGen.appearances);
     
-    // Generate relationships based on profession and location
-    const relationships = generateRelationships(profession, locationKey);
-    const secrets = generateSecrets(profession, locationKey);
+    // Generate rich backstory using the new system
+    const backstory = generateBackstory();
     
-    // Generate story preferences based on personality and profession
-    const storyPreferences = generateStoryPreferences(personality, profession);
+    // Generate deep personality traits
+    const personalityTrait = randomChoice(backstoryGen.personalityTraits.primary);
+    const secondaryTrait = randomChoice(backstoryGen.personalityTraits.secondary);
+    
+    // Generate skills and flaws
+    const skill = randomChoice(backstoryGen.skills);
+    const flaw = randomChoice(backstoryGen.flaws);
+    
+    // Generate current life situation
+    const currentSituation = randomChoice(backstoryGen.currentSituations);
+    
+    // Generate family structure
+    const familyStructure = randomChoice(backstoryGen.familyStructures.types);
+    
+    // Generate relationships (will be connected to other characters later)
+    const relationships = [];
+    const secrets = generateEnhancedSecrets(backstory, personalityTrait, flaw);
+    
+    // Generate story preferences based on personality and background
+    const storyPreferences = generateEnhancedStoryPreferences(personalityTrait, backstory, profession);
     
     return {
         profession,
-        personality,
         age,
-        relationships,
-        secrets,
         appearance,
-        storyPreferences
+        // Enhanced character data
+        backstory,
+        personalityTrait,
+        secondaryTrait,
+        skill,
+        flaw,
+        currentSituation,
+        familyStructure,
+        relationships, // Will be populated during town generation
+        secrets,
+        storyPreferences,
+        // Psychological profile
+        psychologicalProfile: {
+            motivations: personalityTrait.motivations,
+            fears: personalityTrait.fears,
+            stressLevel: currentSituation.stress_level,
+            emotionalState: determineEmotionalState(backstory, personalityTrait, flaw)
+        }
     };
+}
+
+// Enhanced character generation functions for rich backstories
+
+function generateBackstory() {
+    const backstory = {
+        lifeEvents: [],
+        connections: [],
+        formativeExperiences: []
+    };
+    
+    // Generate 1-2 childhood events
+    const childEvents = Math.random() < 0.7 ? 1 : 2;
+    for (let i = 0; i < childEvents; i++) {
+        const event = randomChoice(backstoryGen.majorLifeEvents.childhood);
+        backstory.lifeEvents.push({...event, period: 'childhood'});
+        backstory.connections.push(...event.connections);
+    }
+    
+    // Generate 1-2 adolescence events
+    const teenEvents = Math.random() < 0.8 ? 1 : 2;
+    for (let i = 0; i < teenEvents; i++) {
+        const event = randomChoice(backstoryGen.majorLifeEvents.adolescence);
+        backstory.lifeEvents.push({...event, period: 'adolescence'});
+        backstory.connections.push(...event.connections);
+    }
+    
+    // Generate 1-3 adulthood events
+    const adultEvents = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < adultEvents; i++) {
+        const event = randomChoice(backstoryGen.majorLifeEvents.adulthood);
+        backstory.lifeEvents.push({...event, period: 'adulthood'});
+        backstory.connections.push(...event.connections);
+    }
+    
+    return backstory;
+}
+
+function generateEnhancedSecrets(backstory, personalityTrait, flaw) {
+    const secrets = [];
+    
+    // Secrets based on life events
+    backstory.lifeEvents.forEach(event => {
+        if (Math.random() < 0.4) { // 40% chance each event creates a secret
+            const eventSecrets = {
+                'Lost a parent in the mine collapse': 'Blames themselves for not warning their parent about the danger',
+                'Grew up as an orphan, raised by the community': 'Knows who their real parents were but keeps it hidden',
+                'Child of a disgraced former mayor': 'Has evidence that could clear their parent\'s name',
+                'Survived a terrible fire': 'The fire wasn\'t an accident - they know who started it',
+                'Fell in love with someone from a rival family': 'Still exchanges secret letters with their forbidden love',
+                'Apprenticed under a harsh but skilled master': 'Discovered their master was embezzling from customers',
+                'Discovered a natural talent': 'Their talent comes from an unusual source they can\'t reveal',
+                'Witnessed a terrible injustice': 'Has evidence but fears the consequences of speaking up',
+                'Lost their spouse in an accident': 'Suspects the accident was actually deliberate',
+                'Successfully defended the town': 'Made morally questionable choices during the defense',
+                'Built a successful business': 'Their success involved unethical practices they regret',
+                'Took care of aging parents': 'Discovered dark family secrets while caring for them'
+            };
+            
+            const secret = eventSecrets[event.event];
+            if (secret) {
+                secrets.push(secret);
+            }
+        }
+    });
+    
+    // Secrets based on personality flaws
+    const flawSecrets = {
+        'Quick to anger': 'Once hurt someone badly in a rage and covers it up',
+        'Chronic worrier': 'Has detailed escape plans for every possible disaster',
+        'Pride and arrogance': 'Made a terrible mistake they refuse to acknowledge',
+        'Addictive personality': 'Secretly struggles with their addiction daily',
+        'Overly trusting': 'Been betrayed so many times they\'ve become secretly paranoid',
+        'Secretive nature': 'Keeps detailed records of everyone else\'s secrets',
+        'Perfectionist paralysis': 'Has an important unfinished project they\'re too afraid to complete',
+        'Jealous tendencies': 'Sabotaged someone they envied and got away with it'
+    };
+    
+    if (Math.random() < 0.6) { // 60% chance of flaw-based secret
+        const secret = flawSecrets[flaw.flaw];
+        if (secret) {
+            secrets.push(secret);
+        }
+    }
+    
+    // Add a random secret if we don't have any yet
+    if (secrets.length === 0) {
+        const genericSecrets = [
+            'Has a hidden talent they\'ve never revealed',
+            'Knows about a treasure buried somewhere in town',
+            'Is related to someone important they\'ve never acknowledged',
+            'Witnessed something years ago they\'ve never told anyone',
+            'Has feelings for someone they could never admit to',
+            'Made a promise they\'ve never been able to keep',
+            'Holds a grudge over something most people have forgotten'
+        ];
+        secrets.push(randomChoice(genericSecrets));
+    }
+    
+    return secrets;
+}
+
+function generateEnhancedStoryPreferences(personalityTrait, backstory, profession) {
+    const preferences = {
+        themes: [],
+        truthLevel: '',
+        tone: '',
+        bonusPreferences: [],
+        triggers: [] // Stories that would strongly affect them
+    };
+    
+    // Theme preferences based on personality trait
+    const traitThemes = {
+        'Stalwart Protector': ['government', 'community', 'heroism'],
+        'Curious Scholar': ['mystery', 'discovery', 'truth'],
+        'Wounded Healer': ['tragedy', 'hope', 'redemption'],
+        'Ambitious Climber': ['politics', 'success', 'transformation'],
+        'Gentle Nurturer': ['family', 'community', 'growth'],
+        'Restless Wanderer': ['adventure', 'freedom', 'exploration'],
+        'Dutiful Traditionalist': ['tradition', 'order', 'stability'],
+        'Passionate Revolutionary': ['change', 'justice', 'rebellion']
+    };
+    
+    // Truth level preferences based on personality
+    const traitTruthLevel = {
+        'Stalwart Protector': 'confirmed',
+        'Curious Scholar': 'confirmed',
+        'Wounded Healer': 'rumored',
+        'Ambitious Climber': 'rumored',
+        'Gentle Nurturer': 'confirmed',
+        'Restless Wanderer': 'madeUp',
+        'Dutiful Traditionalist': 'confirmed',
+        'Passionate Revolutionary': 'rumored'
+    };
+    
+    // Tone preferences
+    const traitTones = {
+        'Stalwart Protector': 'heroic',
+        'Curious Scholar': 'intellectual',
+        'Wounded Healer': 'hopeful',
+        'Ambitious Climber': 'dramatic',
+        'Gentle Nurturer': 'heartwarming',
+        'Restless Wanderer': 'adventurous',
+        'Dutiful Traditionalist': 'respectful',
+        'Passionate Revolutionary': 'passionate'
+    };
+    
+    preferences.themes = traitThemes[personalityTrait.trait] || ['general', 'community'];
+    preferences.truthLevel = traitTruthLevel[personalityTrait.trait] || 'confirmed';
+    preferences.tone = traitTones[personalityTrait.trait] || 'dramatic';
+    
+    // Add triggers based on backstory events
+    backstory.lifeEvents.forEach(event => {
+        if (event.event.includes('mine collapse') || event.event.includes('accident')) {
+            preferences.triggers.push('industrial_disaster');
+        }
+        if (event.event.includes('orphan') || event.event.includes('parent')) {
+            preferences.triggers.push('family_separation');
+        }
+        if (event.event.includes('love') || event.event.includes('spouse')) {
+            preferences.triggers.push('romance');
+        }
+        if (event.event.includes('defended') || event.event.includes('injustice')) {
+            preferences.triggers.push('justice_themes');
+        }
+    });
+    
+    return preferences;
+}
+
+function determineEmotionalState(backstory, personalityTrait, flaw) {
+    let stressScore = 0;
+    let positiveScore = 0;
+    
+    // Calculate stress from life events
+    backstory.lifeEvents.forEach(event => {
+        Object.values(event.effects).forEach(intensity => {
+            if (['grief', 'trauma', 'shame', 'heartbreak', 'helplessness', 'loneliness'].some(neg => 
+                Object.keys(event.effects).includes(neg))) {
+                stressScore += intensity;
+            } else {
+                positiveScore += intensity;
+            }
+        });
+    });
+    
+    // Factor in personality
+    if (personalityTrait.fears.includes('chaos') || personalityTrait.fears.includes('failure')) {
+        stressScore += 1;
+    }
+    if (personalityTrait.motivations.includes('help people') || personalityTrait.motivations.includes('create harmony')) {
+        positiveScore += 1;
+    }
+    
+    // Factor in flaw consequences
+    if (flaw.consequences === 'damaged_relationships' || flaw.consequences === 'social_conflicts') {
+        stressScore += 1;
+    }
+    
+    // Determine emotional state
+    if (stressScore > positiveScore + 2) {
+        return 'troubled';
+    } else if (positiveScore > stressScore + 2) {
+        return 'content';
+    } else if (stressScore > 4) {
+        return 'anxious';
+    } else if (positiveScore > 4) {
+        return 'optimistic';
+    } else {
+        return 'stable';
+    }
+}
+
+// Relationship Generation - Creates interconnected character web like Dwarf Fortress
+function generateCharacterRelationships(allNPCs, townInfo) {
+    // Clear any existing relationships
+    allNPCs.forEach(npc => {
+        npc.character.relationships = [];
+    });
+    
+    // Create family connections first
+    generateFamilyConnections(allNPCs);
+    
+    // Create professional relationships
+    generateProfessionalRelationships(allNPCs);
+    
+    // Create social relationships based on shared experiences
+    generateSocialRelationships(allNPCs, townInfo);
+    
+    // Create romantic relationships
+    generateRomanticRelationships(allNPCs);
+    
+    // Create conflicts and rivalries
+    generateConflictRelationships(allNPCs);
+    
+    // Add relationship awareness to each character
+    addRelationshipAwareness(allNPCs);
+}
+
+function generateFamilyConnections(allNPCs) {
+    const familyGroups = [];
+    
+    // Create family clusters
+    allNPCs.forEach(npc => {
+        const family = npc.character.familyStructure;
+        
+        if (family.type === "Large Extended Family" && Math.random() < 0.3) {
+            // 30% chance to have family members in town
+            const possibleRelatives = allNPCs.filter(other => 
+                other !== npc && 
+                !other.character.relationships.some(rel => rel.targetName === npc.name) &&
+                Math.abs(getAgeValue(other.character.age) - getAgeValue(npc.character.age)) < 30
+            );
+            
+            if (possibleRelatives.length > 0) {
+                const relative = randomChoice(possibleRelatives);
+                const relationshipType = randomChoice(['sibling', 'extended_family', 'parent', 'child']);
+                
+                createMutualRelationship(npc, relative, relationshipType, 'family');
+            }
+        }
+        
+        if (family.type === "Nuclear Family" && Math.random() < 0.2) {
+            // 20% chance to have spouse/child in town
+            const possibleFamily = allNPCs.filter(other => 
+                other !== npc && 
+                !other.character.relationships.some(rel => rel.targetName === npc.name)
+            );
+            
+            if (possibleFamily.length > 0) {
+                const familyMember = randomChoice(possibleFamily);
+                const relationshipType = Math.random() < 0.6 ? 'spouse' : 'child';
+                
+                createMutualRelationship(npc, familyMember, relationshipType, 'family');
+            }
+        }
+    });
+}
+
+function generateProfessionalRelationships(allNPCs) {
+    // Group NPCs by profession and location
+    const professionGroups = {};
+    
+    allNPCs.forEach(npc => {
+        const key = `${npc.character.profession}_${npc.location}`;
+        if (!professionGroups[key]) {
+            professionGroups[key] = [];
+        }
+        professionGroups[key].push(npc);
+    });
+    
+    // Create relationships within professional groups
+    Object.values(professionGroups).forEach(group => {
+        if (group.length > 1) {
+            for (let i = 0; i < group.length; i++) {
+                for (let j = i + 1; j < group.length; j++) {
+                    if (Math.random() < 0.7) { // 70% chance of professional relationship
+                        const relationshipType = randomChoice(['colleague', 'mentor', 'competitor']);
+                        createMutualRelationship(group[i], group[j], relationshipType, 'professional');
+                    }
+                }
+            }
+        }
+    });
+    
+    // Create cross-profession business relationships
+    const businessTypes = ['Baker', 'Merchant', 'Barkeep', 'Store owner'];
+    const businessNPCs = allNPCs.filter(npc => 
+        businessTypes.some(type => npc.character.profession.includes(type))
+    );
+    
+    businessNPCs.forEach(businessNPC => {
+        const potentialPartners = allNPCs.filter(other => 
+            other !== businessNPC && 
+            businessTypes.some(type => other.character.profession.includes(type)) &&
+            Math.random() < 0.4
+        );
+        
+        potentialPartners.forEach(partner => {
+            if (!hasRelationshipWith(businessNPC, partner.name)) {
+                createMutualRelationship(businessNPC, partner, 'business_partner', 'professional');
+            }
+        });
+    });
+}
+
+function generateSocialRelationships(allNPCs, townInfo) {
+    // Create friendships based on shared backstory connections
+    allNPCs.forEach(npc => {
+        const connections = npc.character.backstory.connections;
+        
+        const potentialFriends = allNPCs.filter(other => 
+            other !== npc && 
+            other.character.backstory.connections.some(conn => connections.includes(conn))
+        );
+        
+        potentialFriends.forEach(friend => {
+            if (Math.random() < 0.5 && !hasRelationshipWith(npc, friend.name)) {
+                const sharedConnection = connections.find(conn => 
+                    friend.character.backstory.connections.includes(conn)
+                );
+                
+                const relationshipType = Math.random() < 0.7 ? 'close_friend' : 'best_friend';
+                createMutualRelationship(npc, friend, relationshipType, 'social', 
+                    generateRelationshipHistory(sharedConnection));
+            }
+        });
+    });
+    
+    // Create neighborhood relationships
+    const locationGroups = {};
+    allNPCs.forEach(npc => {
+        if (!locationGroups[npc.location]) {
+            locationGroups[npc.location] = [];
+        }
+        locationGroups[npc.location].push(npc);
+    });
+    
+    Object.values(locationGroups).forEach(group => {
+        group.forEach(npc => {
+            const neighbors = group.filter(other => 
+                other !== npc && 
+                Math.random() < 0.3 && 
+                !hasRelationshipWith(npc, other.name)
+            );
+            
+            neighbors.forEach(neighbor => {
+                createMutualRelationship(npc, neighbor, 'neighbor', 'social');
+            });
+        });
+    });
+}
+
+function generateRomanticRelationships(allNPCs) {
+    const availableForRomance = allNPCs.filter(npc => 
+        !npc.character.relationships.some(rel => 
+            ['spouse', 'secret_lover'].includes(rel.relationshipType)
+        )
+    );
+    
+    // Create romantic relationships
+    for (let i = 0; i < availableForRomance.length; i++) {
+        const person1 = availableForRomance[i];
+        if (Math.random() < 0.15) { // 15% chance of being in a romantic relationship
+            const potentialPartners = availableForRomance.filter(other => 
+                other !== person1 && 
+                !hasRelationshipWith(person1, other.name) &&
+                Math.abs(getAgeValue(person1.character.age) - getAgeValue(other.character.age)) < 25
+            );
+            
+            if (potentialPartners.length > 0) {
+                const partner = randomChoice(potentialPartners);
+                const isSecret = Math.random() < 0.3;
+                const relationshipType = isSecret ? 'secret_lover' : 'spouse';
+                
+                createMutualRelationship(person1, partner, relationshipType, 'romantic');
+                
+                // Remove partner from available list
+                const partnerIndex = availableForRomance.indexOf(partner);
+                if (partnerIndex > -1) {
+                    availableForRomance.splice(partnerIndex, 1);
+                }
+            }
+        }
+    }
+    
+    // Create unrequited love
+    allNPCs.forEach(npc => {
+        if (Math.random() < 0.1 && // 10% chance of unrequited love
+            !npc.character.relationships.some(rel => rel.category === 'romantic')) {
+            
+            const targets = allNPCs.filter(other => 
+                other !== npc && 
+                !hasRelationshipWith(npc, other.name)
+            );
+            
+            if (targets.length > 0) {
+                const target = randomChoice(targets);
+                npc.character.relationships.push({
+                    targetName: target.name,
+                    relationshipType: 'unrequited_love',
+                    category: 'romantic',
+                    intensity: 3,
+                    quality: 'yearning',
+                    history: 'Has harbored secret feelings but never confessed'
+                });
+            }
+        }
+    });
+}
+
+function generateConflictRelationships(allNPCs) {
+    // Create rivalries and enemies based on conflicting interests
+    allNPCs.forEach(npc => {
+        if (Math.random() < 0.2) { // 20% chance of having an enemy/rival
+            const potentialConflicts = allNPCs.filter(other => 
+                other !== npc && 
+                !hasRelationshipWith(npc, other.name) &&
+                (
+                    // Professional competition
+                    other.character.profession === npc.character.profession ||
+                    // Personality conflicts
+                    personalityConflicts(npc.character.personalityTrait, other.character.personalityTrait) ||
+                    // Flaw-based conflicts
+                    flawConflicts(npc.character.flaw, other.character.flaw)
+                )
+            );
+            
+            if (potentialConflicts.length > 0) {
+                const conflict = randomChoice(potentialConflicts);
+                const isEnemy = Math.random() < 0.3;
+                const relationshipType = isEnemy ? 'enemy' : 'rival';
+                const reason = generateConflictReason(npc, conflict);
+                
+                createMutualRelationship(npc, conflict, relationshipType, 'antagonistic', reason);
+            }
+        }
+    });
+}
+
+function addRelationshipAwareness(allNPCs) {
+    // Each character gains knowledge about other characters' relationships
+    allNPCs.forEach(npc => {
+        npc.character.knownRelationships = [];
+        
+        // Characters know about relationships of people they're close to
+        const closeRelationships = npc.character.relationships.filter(rel => 
+            rel.intensity >= 3
+        );
+        
+        closeRelationships.forEach(closeRel => {
+            const closePersonNPC = allNPCs.find(other => other.name === closeRel.targetName);
+            if (closePersonNPC) {
+                // Know about some of their close person's relationships
+                const knownRelationships = closePersonNPC.character.relationships.filter(() => 
+                    Math.random() < 0.6 // 60% chance of knowing about each relationship
+                );
+                
+                knownRelationships.forEach(rel => {
+                    npc.character.knownRelationships.push({
+                        subject: closeRel.targetName,
+                        target: rel.targetName,
+                        relationship: rel.relationshipType,
+                        opinion: generateOpinionAboutRelationship(npc, closeRel, rel)
+                    });
+                });
+            }
+        });
+        
+        // Characters also know about public relationships (marriages, business partnerships)
+        const publicRelationships = [];
+        allNPCs.forEach(other => {
+            if (other !== npc) {
+                const publicRels = other.character.relationships.filter(rel => 
+                    ['spouse', 'business_partner', 'enemy'].includes(rel.relationshipType)
+                );
+                publicRels.forEach(rel => {
+                    if (Math.random() < 0.8) { // 80% chance of knowing public relationships
+                        publicRelationships.push({
+                            subject: other.name,
+                            target: rel.targetName,
+                            relationship: rel.relationshipType,
+                            opinion: 'public_knowledge'
+                        });
+                    }
+                });
+            }
+        });
+        
+        npc.character.knownRelationships.push(...publicRelationships);
+    });
+}
+
+// Helper functions for relationship system
+function createMutualRelationship(npc1, npc2, relationshipType, category, history = null) {
+    const relTypeData = relationshipGen.relationshipTypes.find(rt => rt.type === relationshipType);
+    const intensity = relTypeData ? relTypeData.intensity : 2;
+    const quality = randomChoice(relationshipGen.relationshipQualities);
+    const relationshipHistory = history || randomChoice(relationshipGen.relationshipHistory);
+    
+    // Add relationship to first character
+    npc1.character.relationships.push({
+        targetName: npc2.name,
+        relationshipType: relationshipType,
+        category: category,
+        intensity: intensity,
+        quality: quality,
+        history: relationshipHistory
+    });
+    
+    // Add reciprocal relationship to second character
+    npc2.character.relationships.push({
+        targetName: npc1.name,
+        relationshipType: relationshipType,
+        category: category,
+        intensity: intensity,
+        quality: quality,
+        history: relationshipHistory
+    });
+}
+
+function hasRelationshipWith(npc, targetName) {
+    return npc.character.relationships.some(rel => rel.targetName === targetName);
+}
+
+function getAgeValue(age) {
+    const ageMap = {
+        'Young adult': 25,
+        'Adult': 35,
+        'Middle-aged': 50,
+        'Elderly': 70
+    };
+    return ageMap[age] || 35;
+}
+
+function personalityConflicts(trait1, trait2) {
+    const conflicts = {
+        'Dutiful Traditionalist': ['Passionate Revolutionary', 'Restless Wanderer'],
+        'Passionate Revolutionary': ['Dutiful Traditionalist', 'Stalwart Protector'],
+        'Ambitious Climber': ['Gentle Nurturer', 'Dutiful Traditionalist'],
+        'Restless Wanderer': ['Dutiful Traditionalist', 'Gentle Nurturer']
+    };
+    
+    return conflicts[trait1.trait] && conflicts[trait1.trait].includes(trait2.trait);
+}
+
+function flawConflicts(flaw1, flaw2) {
+    const conflicts = {
+        'Pride and arrogance': ['Pride and arrogance'],
+        'Quick to anger': ['Quick to anger', 'Perfectionist paralysis'],
+        'Jealous tendencies': ['Ambitious Climber', 'Pride and arrogance']
+    };
+    
+    return conflicts[flaw1.flaw] && conflicts[flaw1.flaw].includes(flaw2.flaw);
+}
+
+function generateConflictReason(npc1, npc2) {
+    const reasons = [
+        `Disagreement over professional practices`,
+        `Competing for the same customers or resources`,
+        `Past misunderstanding that escalated`,
+        `Different views on town governance`,
+        `Personality clash that grew into animosity`,
+        `One wronged the other's family member`,
+        `Business deal gone bad`,
+        `Competing for the same romantic interest`
+    ];
+    
+    return randomChoice(reasons);
+}
+
+function generateRelationshipHistory(sharedConnection) {
+    const connectionHistories = {
+        'mine_accident_survivors': 'Both survived the mine collapse and helped each other through the aftermath',
+        'community_raised': 'Grew up together as orphans, supporting each other through difficult times',
+        'family_feuds': 'Despite their families\' enmity, they found common ground',
+        'disaster_survivors': 'Bonded while helping rebuild after a community disaster',
+        'star_crossed_lovers': 'Once harbored romantic feelings but life took them different paths',
+        'master_craftspeople': 'Learned their trades from the same master craftsperson',
+        'town_defenders': 'Fought side by side to protect the town from bandits'
+    };
+    
+    return connectionHistories[sharedConnection] || randomChoice(relationshipGen.relationshipHistory);
+}
+
+function generateOpinionAboutRelationship(observer, observerRel, observedRel) {
+    // Generate opinions based on observer's personality and values
+    const opinions = [
+        'approves', 'disapproves', 'envies', 'worries about', 
+        'supports', 'finds suspicious', 'thinks is unhealthy', 
+        'believes is good for both', 'thinks is doomed to fail'
+    ];
+    
+    return randomChoice(opinions);
 }
 
 function generateStoryPreferences(personality, profession) {
@@ -512,22 +2797,274 @@ function generateSecrets(profession, locationKey) {
     return [randomChoice(baseSecrets)];
 }
 
-function generateDialogue(character, info) {
-    const dialoguePatterns = {
-        'Barkeep': [`Welcome to my tavern! I've been pouring drinks here for years.`, `What brings you to our humble establishment?`, `I hear all the town's news from behind this bar.`],
-        'Baker': [`Fresh bread, still warm from the oven!`, `I've been baking for this town for ages.`, `Times have been hard since... well, you know.`],
-        'Merchant': [`Business isn't what it used to be around here.`, `I've traveled to many towns, but this one...`, `The trade routes just aren't the same anymore.`],
-        'Former miner': [`*takes a long drink* That mine... it changed everything.`, `I used to work those tunnels every day.`, `Some things are better left buried.`],
-        'Guard captain': [`Everything's under control here, citizen.`, `The mayor's orders are clear on this matter.`, `I maintain the peace in this town.`],
-        'Town clerk': [`*whispers* I see all the official business that goes through here.`, `The paperwork tells a different story sometimes.`, `There are things the people should know about.`],
-        'Mayor': [`We're working on great opportunities for our town.`, `The future holds promise for our community.`, `Sometimes difficult decisions must be made for the greater good.`]
+// Dynamic Dialogue System - Changes every day
+function generateEnhancedDialogue(character, info, characterData) {
+    const day = gameState.day;
+    const conversationsHad = characterData ? characterData.conversationsHad : 0;
+    const relationshipLevel = characterData ? characterData.relationshipLevel : 'acquaintance';
+    const lastSeen = characterData ? characterData.lastSeen : 0;
+    const daysSinceLastTalk = day - lastSeen;
+    
+    // Multiple dialogue variations that change based on context
+    const dialogueVariations = {
+        firstMeeting: [
+            'Welcome to our town, traveler. ',
+            'Ah, a new face in town. ',
+            'Hello there, stranger. '
+        ],
+        returningAfterAbsence: [
+            'Well, well! Look who is back. ',
+            'You are back! I thought you might have moved on. ',
+            'The wandering storyteller returns. '
+        ],
+        dailyGreeting: [
+            'Good to see you again. ',
+            'Ah, my favorite storyteller returns. ',
+            'You are becoming a regular around here. '
+        ],
+        deepeningRelationship: [
+            'I have been thinking about what you said yesterday. ',
+            'I feel like I can trust you more now. ',
+            'Since we have talked before, I should mention that '
+        ],
+        morning: [
+            'Good morning! The town is just waking up. ',
+            'Early riser, eh? ',
+            'Just getting started with the day. '
+        ],
+        evening: [
+            'Evening already? The day has flown by. ',
+            'It has been a long day. ',
+            'As the day winds down, I find myself reflecting on '
+        ]
     };
     
-    const patterns = dialoguePatterns[character.profession] || [`Hello there, traveler.`, `What can I do for you?`, `Times are changing around here.`];
-    return randomChoice(patterns);
+    const outros = {
+        firstMeeting: [
+            'I hope you find what you are looking for here.',
+            'Feel free to ask if you need anything.',
+            'It is always good to meet new people.'
+        ],
+        returningAfterAbsence: [
+            'It is good to see a familiar face again.',
+            'I hope you have been well since we last spoke.',
+            'The town has not been the same without your stories.'
+        ],
+        dailyGreeting: [
+            'I look forward to hearing what you have learned today.',
+            'Your stories always brighten my day.',
+            'You are getting to know this town well.'
+        ],
+        deepeningRelationship: [
+            'I am glad we have had these conversations.',
+            'You are not like other travelers who just pass through.',
+            'I feel like you really understand this place.'
+        ],
+        morning: [
+            'The day is young, plenty of time for stories.',
+            'Morning is when I do my best thinking.',
+            'A fresh day brings fresh opportunities.'
+        ],
+        evening: [
+            'The evening always brings a different perspective.',
+            'Time to rest and prepare for tomorrow.',
+            'The night brings its own kind of wisdom.'
+        ]
+    };
+    
+    // Determine which variation to use based on multiple factors
+    let variation = 'dailyGreeting';
+    
+    if (conversationsHad === 0) {
+        variation = 'firstMeeting';
+    } else if (daysSinceLastTalk > 3) {
+        variation = 'returningAfterAbsence';
+    } else if (relationshipLevel === 'friend' || relationshipLevel === 'confidant') {
+        variation = 'deepeningRelationship';
+    } else if (day % 2 === 0) { // Alternate between morning/evening themes
+        variation = 'morning';
+    } else {
+        variation = 'evening';
+    }
+    
+    // Add day-specific variations
+    if (day === 1) {
+        variation = 'firstMeeting';
+    } else if (day > 10 && Math.random() < 0.3) {
+        variation = 'deepeningRelationship';
+    }
+    
+    // Get random intro and outro from the appropriate variation
+    const intros = dialogueVariations[variation];
+    const variationOutros = outros[variation];
+    
+    const intro = intros[Math.floor(Math.random() * intros.length)];
+    const outro = variationOutros[Math.floor(Math.random() * variationOutros.length)];
+    
+    // Add emotional context based on character state
+    let emotionalContext = '';
+    if (character.psychologicalProfile) {
+        const emotionalState = character.psychologicalProfile.emotionalState;
+        if (emotionalState === 'troubled') {
+            emotionalContext = ' *They seem agitated* ';
+        } else if (emotionalState === 'optimistic') {
+            emotionalContext = ' *Their mood seems bright* ';
+        } else if (emotionalState === 'anxious') {
+            emotionalContext = ' *They glance around nervously* ';
+        }
+    }
+    
+    // Add relationship-specific context
+    let relationshipContext = '';
+    if (relationshipLevel === 'friend') {
+        relationshipContext = ' You know, since we have talked before, ';
+    } else if (relationshipLevel === 'confidant') {
+        relationshipContext = ' I trust you enough to tell you that ';
+    }
+    
+    // Add recent events context
+    let recentEventsContext = '';
+    if (gameState.lastPerformanceEffectiveness) {
+        const effectiveness = gameState.lastPerformanceEffectiveness;
+        if (effectiveness > 0.8) {
+            recentEventsContext = ' I heard about your amazing performance last night! ';
+        } else if (effectiveness < 0.3) {
+            recentEventsContext = ' I heard things did not go so well last night. ';
+        }
+    }
+    
+    // Add day-specific context
+    let dayContext = '';
+    if (day === 1) {
+        dayContext = ' Your first day in town, eh? ';
+    } else if (day > 5) {
+        dayContext = ' You have been here a while now. ';
+    }
+    
+    // Add conversation-specific context
+    let conversationContext = '';
+    if (conversationsHad > 5) {
+        conversationContext = ' We have talked many times now. ';
+    } else if (conversationsHad > 2) {
+        conversationContext = ' We are getting to know each other. ';
+    }
+    
+    // Combine everything with randomization
+    const baseInfo = info.text.charAt(0).toLowerCase() + info.text.slice(1);
+    const contexts = [emotionalContext, recentEventsContext, dayContext, conversationContext, relationshipContext].filter(c => c);
+    
+    // Randomly include some contexts to make dialogue more varied
+    const selectedContexts = contexts.filter(() => Math.random() < 0.7);
+    const fullDialogue = intro + selectedContexts.join('') + baseInfo + ' ' + outro;
+    
+    return fullDialogue;
+}
+
+function generateDialogue(character, info) {
+    // Use enhanced dialogue system if we have character data
+    const characterData = gameState.knownCharacters[character.name];
+    if (characterData) {
+        return generateEnhancedDialogue(character, info, characterData);
+    }
+    
+    // Fallback to original system for new characters
+    const intros = {
+        'Barkeep': `This old tavern has heard more tales than I've poured ales. What's your story, traveler? Speaking of stories, `,
+        'Baker': `Ah, the smell of fresh bread. It's one of the few simple comforts left. You know, `,
+        'Merchant': `Another traveler. Welcome. Trade isn't what it once was. For instance, `,
+        'Former miner': `*He stares into his drink, then looks up at you with hollow eyes.* You weren't here for the good times. Before the collapse, `,
+        'Guard captain': `Keep your nose clean and we'll get along fine. The Mayor wants order, and I provide it. But even I've noticed `,
+        'Town clerk': `*She nervously shuffles a stack of papers.* Official business. Always so much of it. If you read between the lines, you'd see that `,
+        'Mayor': `Welcome to our town! We are on the cusp of a grand new chapter. Of course, progress requires... adjustments. For example, `,
+        'Widow/widower': `It's a quiet life, now. My dearly departed used to say that `,
+        'Former fisherman': `The sea... she's a fickle mistress. One day she gives you a bounty, the next she takes it all away. I remember when `,
+        'Dock worker': `Busy, busy. Always something to load or unload. But the cargo's been... different lately. `,
+        'Mill worker': `The great wheel turns, day in and day out. It's steady work, which is more than some can say. I've heard that `
+    };
+
+    const leadIn = intros[character.profession] || `Hello there, traveler. I was just thinking about how `;
+    
+    // Add personality-based flavor based on their current emotional state and background
+    let emotionalContext = '';
+    if (character.psychologicalProfile) {
+        switch(character.psychologicalProfile.emotionalState) {
+            case 'troubled':
+                emotionalContext = ' *Their hands shake slightly as they speak* ';
+                break;
+            case 'anxious':
+                emotionalContext = ' *They glance around nervously* ';
+                break;
+            case 'optimistic':
+                emotionalContext = ' *Their eyes brighten with hope* ';
+                break;
+            case 'content':
+                emotionalContext = ' *They speak with quiet confidence* ';
+                break;
+        }
+    }
+    
+    const baseDialogue = `${leadIn}${emotionalContext}${info.text.charAt(0).toLowerCase() + info.text.slice(1)}`;
+    
+    // Add a concluding sentence that reflects the character's personality trait and current situation.
+    const personalityTrait = character.personalityTrait ? character.personalityTrait.trait : 'Unknown';
+    const outros = {
+        'Stalwart Protector': `...Someone needs to keep watch over this place, and I suppose that's me.`,
+        'Curious Scholar': `...There's always more to learn if you know where to look.`,
+        'Wounded Healer': `...We all carry our burdens, but maybe sharing them makes them lighter.`,
+        'Ambitious Climber': `...Mark my words, things are going to change around here, one way or another.`,
+        'Gentle Nurturer': `...I just want what's best for everyone, you understand?`,
+        'Restless Wanderer': `...Sometimes I wonder what lies beyond these familiar streets.`,
+        'Dutiful Traditionalist': `...The old ways may seem outdated, but they've kept us together this long.`,
+        'Passionate Revolutionary': `...The time for change is coming, whether people are ready or not.`,
+        // Fallback for old personality system
+        'Suspicious and paranoid': `...But don't you go repeating that. You never know who's listening.`,
+        'Wise but melancholy': `...It's just the way of things, I suppose.`,
+        'Gossipy and talkative': `...and that's the truth of it! Or, well, something like it!`,
+        'Quiet and observant': `...Make of that what you will.`,
+        'Mysterious and evasive': `...Or so I've heard. One can never be too sure.`,
+        'Hardworking and practical': `...Just another problem to solve. Now, if you'll excuse me, the work won't do itself.`,
+        'Dreamy and philosophical': `...It makes you wonder about the grand tapestry of it all, doesn't it?`,
+        'Bitter about the past': `...This town is drowning in its own history, and no one seems to care.`
+    };
+
+    const concludingRemark = outros[personalityTrait] || outros[character.personality] || ``;
+    
+    return `${baseDialogue} ${concludingRemark}`;
 }
 
 function distributeStoryElements(townType) {
+    // Use evolved story state if available
+    if (gameState.townStoryState && gameState.townStoryState.elements) {
+        // Filter out debunked and old news (unless we're running low on content)
+        let availableElements = gameState.townStoryState.elements.filter(e => 
+            e.currentType !== 'debunked' && e.currentType !== 'old_news'
+        );
+        
+        // If we don't have enough active elements, include old news
+        if (availableElements.length < 8) {
+            availableElements = gameState.townStoryState.elements.filter(e => 
+                e.currentType !== 'debunked'
+            );
+        }
+
+        // Convert to the format expected by the rest of the system
+        const formattedElements = availableElements.map(element => ({
+            text: element.originalText,
+            type: element.currentType,
+            id: element.id,
+            evolutionHistory: element.evolutionHistory
+        }));
+
+        // Shuffle and return
+        for (let i = formattedElements.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [formattedElements[i], formattedElements[j]] = [formattedElements[j], formattedElements[i]];
+        }
+
+        return formattedElements;
+    }
+
+    // Fallback to original system if no story state exists
     const allElements = [];
     
     // Get town-specific story elements
@@ -634,11 +3171,33 @@ function generateLocations() {
         }
     };
     
-    // Generate NPCs for each location
+    // Add lighthouse for coastal towns
+    if (townInfo.type === 'coastal') {
+        locationData.lighthouse = {
+            name: `🗼 ${generateLocationName('lighthouse')}`,
+            description: `The lighthouse stands tall on the cliffs, guiding ships safely to harbor. Its keeper is a local legend.`,
+            npcs: []
+        };
+    }
+    // Add more locations as desired (e.g., graveyard, school, etc.)
+    locationData.graveyard = {
+        name: `⚰️ ${generateLocationName('graveyard')}`,
+        description: `The graveyard is a quiet, somber place, filled with the stories of those who came before.`,
+        npcs: []
+    };
+    locationData.school = {
+        name: `🏫 ${generateLocationName('school')}`,
+        description: `The town's school is a hub of learning and youthful energy.`,
+        npcs: []
+    };
+    
+    // First, generate all NPCs
+    const allNPCs = [];
     Object.keys(locationData).forEach(locationKey => {
         const actualKey = locationKey === 'industrial' ? getIndustrialMappingKey(townInfo.type) : 
                            locationKey === 'government' ? 'mayor' : locationKey;
-        const numNPCs = 2 + Math.floor(Math.random() * 2); // 2-3 NPCs per location
+        // Increase NPCs per location to 4-6
+        const numNPCs = 4 + Math.floor(Math.random() * 3); // 4-6 NPCs per location
         
         for (let i = 0; i < numNPCs; i++) {
             const name = generateCharacterName();
@@ -658,22 +3217,39 @@ function generateLocations() {
             
             if (hasStoryElement) elementIndex++;
             
-            const dialogue = generateDialogue(character, info);
-            
-            locationData[locationKey].npcs.push({
+            const npc = {
                 name,
-                dialogue,
                 character,
-                info
-            });
+                info,
+                location: locationKey
+            };
+            
+            allNPCs.push(npc);
         }
     });
     
-    // Store town info for use elsewhere
+    // Generate relationships between characters
+    generateCharacterRelationships(allNPCs, townInfo);
+    
+    // Now assign NPCs to locations and generate dialogue with relationship awareness
+    allNPCs.forEach(npc => {
+        npc.dialogue = generateDialogue(npc.character, npc.info);
+        locationData[npc.location].npcs.push(npc);
+    });
+    
+    // Store town info and NPC reference for use elsewhere
     locationData.townInfo = townInfo;
+    locationData.allNPCs = allNPCs; // Store for relationship queries
     
     // Generate inn price for this town
     gameState.innCostPerNight = generateInnPrice(townInfo);
+    
+    // Debug log to help track down undefined location names
+    console.log('Generated locations:', Object.keys(locationData).map(key => ({
+        key,
+        name: locationData[key].name,
+        hasNPCs: locationData[key].npcs ? locationData[key].npcs.length : 'no npcs property'
+    })));
     
     return locationData;
 }
@@ -681,8 +3257,6 @@ function generateLocations() {
 function getIndustrialDescription(townInfo) {
     const descriptions = {
         mining: `The old mining operations stand as a testament to both ${townInfo.name}'s former glory and current struggles. ${townInfo.atmosphere}, the area holds memories of busier times.`,
-        trading: `The main commercial hub shows signs of ${townInfo.name}'s trading heritage. ${townInfo.atmosphere}, with evidence of the town's economic challenges.`,
-        farming: `The agricultural center of ${townInfo.name} reflects the community's relationship with the land. ${townInfo.atmosphere}, showing the effects of recent hardships.`,
         coastal: `The maritime facilities tell the story of ${townInfo.name}'s connection to the sea. ${townInfo.atmosphere}, bearing the marks of storms both literal and economic.`
     };
     
@@ -693,8 +3267,6 @@ function getIndustrialMappingKey(townType) {
     // Map town types to character generation keys
     const mapping = {
         mining: 'mine',
-        trading: 'market', 
-        farming: 'farming',
         coastal: 'coastal'
     };
     
@@ -708,58 +3280,86 @@ let locations = {};
 const storyTemplates = {
     act1: {
         industrial: {
-            confirmed: "In the heart of industry, where hardworking people once built prosperity...",
-            rumored: "In the abandoned workplaces, where mysterious events preceded disaster...",
-            madeUp: "In the mystical ruins, where ancient powers still linger..."
+            confirmed: "I sing a tale of gears and grit, of hardworking folk whose prosperity was shattered by a promise of the earth, broken...",
+            rumored: "Listen close, for in the shadows of the abandoned mine, a chilling secret lies buried deeper than any ore...",
+            madeUp: "Beyond the veil of the mundane, I shall tell of a place where the mountain itself breathes, and its heart is not stone, but starlight...",
+            sabotage: "A tale of sabotage in the heart of the mines, where greed and envy spark disaster...",
+            laborStrike: "The workers, tired of broken promises, rise up in a strike that shakes the very foundations of the town..."
         },
         market: {
-            confirmed: "In the bustling market square, where merchants struggle with economic hardship...",
-            rumored: "In the market square, where whispers speak of a town on the verge of transformation...",
-            madeUp: "In the enchanted marketplace, where magical goods are traded under the light of the moon..."
+            confirmed: "Gather 'round and hear the story of the marketplace, the heart of this town, and how its beat has grown faint with hardship...",
+            rumored: "They say more than goods are traded in the market stalls at midnight. Whispers, secrets, and the fate of the town itself...",
+            madeUp: "I speak of an enchanted bazaar, where desires are bartered, and every trinket holds a spark of true magic...",
+            festival: "A grand festival draws crowds and trouble alike, as fortunes are made and lost in a single day...",
+            rivalry: "Two rival merchants wage a silent war, their feud threatening to tear the market apart..."
         },
         tavern: {
-            confirmed: "In the tavern where all the town's secrets are shared over ale and hardship...",
-            rumored: "In the tavern where ghostly voices and strange tales echo through the night...",
-            madeUp: "In the mystical tavern, where the spirits of ancient bards gather to share forgotten tales..."
+            confirmed: "In this very tavern, where ale flows and tongues are loosened, the truest tales of this town are told in hushed tones...",
+            rumored: "Not all who linger in this tavern are of flesh and blood. Some are echoes of the past, with stories they are dying to share...",
+            madeUp: "Imagine a mystical tavern, a crossroads between worlds, where heroes and monsters share a drink and trade destinies...",
+            brawl: "A legendary brawl erupts, drawing in every patron and leaving the tavern changed forever...",
+            secretMeeting: "Behind closed doors, a secret meeting plots the fate of the town..."
         },
         government: {
-            confirmed: "In the halls of power, where leaders make decisions that shape the community's future...",
-            rumored: "In the government offices, where secret meetings and hidden agendas lurk behind closed doors...",
-            madeUp: "In the grand palace, where noble lords plot and scheme in chambers of marble and gold..."
+            confirmed: "I will recount a story from the halls of power, of difficult choices made by leaders that have shaped the very stones of this town...",
+            rumored: "Behind the closed doors of the town hall, a game of shadows is played, where the prize is the soul of this community...",
+            madeUp: "Let us journey to a grand palace of shining marble, where intrigue is the wine and the fate of kingdoms hangs on a single, well-placed word...",
+            coup: "A coup brews beneath the surface, as ambitious councilors plot to seize control...",
+            scandal: "A scandal erupts, threatening to topple the town's most powerful figures..."
+        },
+        coastal: {
+            confirmed: "I sing of the sea, its boundless beauty and its unforgiving wrath, and of the souls who live by its rhythm...",
+            rumored: "The tide brings in more than fish and foam. It carries secrets from the deep, of phantom ships and drowned sorrows...",
+            madeUp: "Hear now of a kingdom beneath the waves, where merfolk rule and the storms are but the whims of a sea-god's mood...",
+            shipwreck: "A shipwreck brings both tragedy and opportunity to the shore...",
+            smuggling: "Smugglers ply their trade under cover of fog, risking all for forbidden riches..."
+        },
+        agricultural: {
+            confirmed: "A tale of the land, of the patient toil of farmers, and of a season that tested their resilience to the very breaking point...",
+            rumored: "In the rustling crops and the silent scarecrows, there are secrets of the old earth, whispers of a harvest that was not meant for mortal men...",
+            madeUp: "I shall tell of an enchanted grove, where the soil yields wonders and the trees bear fruit of pure sunlight and moonbeams...",
+            blight: "A mysterious blight threatens the harvest, and only the bravest dare seek its cause...",
+            landDispute: "A bitter land dispute divides neighbors and families, with the future of the fields at stake..."
         }
     },
     act2: {
         adventure: {
-            confirmed: "Inspired by tales of former prosperity, [PROTAGONIST] ventures forth to change their fate...",
-            rumored: "Driven by whispers from [SUPPORTING_CHAR], [PROTAGONIST] dares to investigate the mysteries surrounding them...",
-            madeUp: "[PROTAGONIST] emerges as a hero blessed with magical powers to overcome any obstacle..."
+            confirmed: "With courage born of desperation and hope kindled by memory, [PROTAGONIST] sets forth into the unknown, seeking what was lost...",
+            rumored: "Heeding the cryptic counsel of [SUPPORTING_CHAR], [PROTAGONIST] dares to walk paths shrouded in whisper and shadow...",
+            madeUp: "Awakened to powers beyond mortal ken, [PROTAGONIST] strides forth as champion of the mystical realm, where impossibility bows to will...",
+            chase: "A desperate chase ensues, with [PROTAGONIST] pursued by unseen foes through twisting alleys and shadowed woods...",
+            rescue: "A daring rescue is mounted, as [PROTAGONIST] risks all to save [SUPPORTING_CHAR] from peril..."
         },
         discovery: {
-            confirmed: "Through careful investigation, [PROTAGONIST] and [SUPPORTING_CHAR] work together as the truth slowly reveals itself...",
-            rumored: "Following rumors and signs, [PROTAGONIST] makes a discovery that could change everything...",
-            madeUp: "In a burst of magical revelation, [PROTAGONIST] unveils ancient secrets in spectacular fashion..."
+            confirmed: "Through patient toil and careful observation, [PROTAGONIST] and [SUPPORTING_CHAR] piece together fragments of a larger truth...",
+            rumored: "Following threads of rumor and signs half-glimpsed, [PROTAGONIST] unearths secrets that may reshape everything...",
+            madeUp: "In a moment of divine revelation, the veil between worlds parts for [PROTAGONIST], revealing wonders beyond imagination...",
+            betrayal: "A shocking betrayal is revealed, forcing [PROTAGONIST] to question all they thought they knew...",
+            puzzle: "A cryptic puzzle must be solved, with the fate of many hanging in the balance..."
         },
         conflict: {
-            confirmed: "[PROTAGONIST] faces real opposition as [ANTAGONIST] and the established order resist change...",
-            rumored: "Dark forces led by [ANTAGONIST] seem to conspire against [PROTAGONIST] who seeks the truth...",
-            madeUp: "Epic battles rage as [PROTAGONIST] fights the dark forces commanded by [ANTAGONIST]..."
+            confirmed: "Now [PROTAGONIST] stands against the tide of resistance, as [ANTAGONIST] marshals all who fear the coming change...",
+            rumored: "From the shadows emerges [ANTAGONIST], weaving conspiracies to ensnare [PROTAGONIST] in a web of doubt and danger...",
+            madeUp: "The very heavens tremble as [PROTAGONIST] faces the dark sorcery of [ANTAGONIST], in a clash that will echo through eternity!",
+            duel: "A fateful duel is fought, with honor, pride, and the future at stake...",
+            naturalDisaster: "A sudden natural disaster strikes, forcing friend and foe alike to unite or perish..."
         }
     },
     act3: {
         triumph: {
-            confirmed: "Through persistence and courage, [PROTAGONIST] solves the problem and [TOWN_NAME] prospers once more...",
-            rumored: "[PROTAGONIST] solves the mystery, though new questions remain that [SUPPORTING_CHAR] will ponder for years to come...",
-            madeUp: "[PROTAGONIST] triumphs over the evil [ANTAGONIST], and [TOWN_NAME] is saved by the power of true heroism..."
+            confirmed: "And so it was that [PROTAGONIST] persevered through every trial. [TOWN_NAME] prospered once more, its people free from the burdens that had long weighed upon them. Years later, travelers would still speak of how one person's courage restored an entire community to hope and prosperity.",
+            rumored: "The mysteries surrounding [PROTAGONIST]'s success remained, but none could deny the transformation of [TOWN_NAME]. [SUPPORTING_CHAR] became the keeper of the true tale, though they chose to share it only with those who truly understood the price of change. The town thrived, and that was enough.",
+            madeUp: "With [ANTAGONIST] banished forever and the ancient magics restored to balance, [PROTAGONIST] was hailed as the greatest hero [TOWN_NAME] had ever known. The town became a beacon of wonder, drawing pilgrims from across the land who came to witness where the impossible had been made real."
         },
         tragedy: {
-            confirmed: "Despite [PROTAGONIST]'s good intentions, the harsh realities of life in [TOWN_NAME] prevail...",
-            rumored: "The truth remains elusive to [PROTAGONIST], leaving [SUPPORTING_CHAR] and others to wonder what really happened...",
-            madeUp: "In a twist of fate, [PROTAGONIST]'s greatest strength becomes their ultimate weakness against [ANTAGONIST]..."
+            confirmed: "[PROTAGONIST]'s noble efforts ended in heartbreak, but their sacrifice was not forgotten. Though [TOWN_NAME] could not be saved from its fate, the people learned to honor those who tried. [SUPPORTING_CHAR] raised a monument to their fallen friend, ensuring their memory would endure even if their dreams could not.",
+            rumored: "When the morning came, [PROTAGONIST] was gone, vanished like smoke on the wind. [SUPPORTING_CHAR] searched everywhere but found only silence. [TOWN_NAME] slowly accepted that some mysteries are meant to remain unsolved, and some heroes are destined to walk alone into the unknown.",
+            madeUp: "The final battle claimed [PROTAGONIST]'s life, but their sacrifice sealed [ANTAGONIST] forever in the realm of shadows. [TOWN_NAME] mourned their fallen champion with songs that would be sung for a thousand years. Magic faded from the world, but so too did the darkness that had threatened to consume everything."
         },
         change: {
-            confirmed: "[PROTAGONIST] helps [TOWN_NAME] adapt to new circumstances, finding strength in unity and hard work...",
-            rumored: "[PROTAGONIST] brings change to [TOWN_NAME], though whether for better or worse remains to be seen by [SUPPORTING_CHAR]...",
-            madeUp: "[PROTAGONIST]'s actions shift the very fabric of reality, transforming [TOWN_NAME] in wondrous ways..."
+            confirmed: "Neither victory nor defeat, but transformation - this was [PROTAGONIST]'s legacy. [TOWN_NAME] learned to adapt, its people stronger for having faced their challenges together. [SUPPORTING_CHAR] helped guide the community toward a future none of them could have imagined, built on the foundation of what they had learned from their trials.",
+            rumored: "The true outcome remained shrouded in mystery, but [TOWN_NAME] was undeniably different. Some changes were visible - new buildings, different faces in positions of power. Others ran deeper, in how people treated one another and what they chose to believe. [SUPPORTING_CHAR] often smiled at questions about what really happened, saying only that the future would reveal all.",
+            madeUp: "The ancient magic unleashed by [PROTAGONIST] rewrote the very laws that governed [TOWN_NAME], creating a place where the extraordinary became commonplace. Children grew up able to speak with animals, crops grew in perfect spirals reaching toward the sky, and the boundary between dreams and reality grew thin. It was chaos, it was wonder, and it was home."
         }
     }
 };
@@ -850,22 +3450,83 @@ function updateUI() {
     const infoList = document.getElementById('information-list');
     infoList.innerHTML = '';
     
-    // Show known characters (persistent)
+    // Remove any existing event listeners and add a single delegated event handler
+    infoList.onclick = null;
+    infoList.addEventListener('click', (event) => {
+        const characterCard = event.target.closest('[data-character-card="true"]');
+        if (characterCard) {
+            const characterName = characterCard.getAttribute('data-character-name');
+            console.log('Character card clicked via delegation:', characterName);
+            event.preventDefault();
+            event.stopPropagation();
+            showCharacterDetails(characterName);
+        }
+    });
+    
+    // Show known characters (persistent) - Simplified display
     const knownCharactersList = Object.values(gameState.knownCharacters);
+    console.log('updateUI called - Known characters count:', knownCharactersList.length);
+    console.log('Known characters:', knownCharactersList.map(c => c.name));
+    
+    // Check if Info tab is currently visible
+    const infoTab = document.getElementById('tab-info');
+    const infoTabVisible = infoTab && infoTab.style.display !== 'none';
+    console.log('Info tab visible when creating character cards:', infoTabVisible);
+    console.log('Info tab element:', infoTab);
+    console.log('Info tab style.display:', infoTab?.style.display);
+    
     if (knownCharactersList.length > 0) {
         infoList.innerHTML += '<h4 style="color: #daa520; margin-bottom: 10px;">🧑 Known Characters:</h4>';
         knownCharactersList.forEach(character => {
+            console.log('Creating character card for:', character.name);
             const charDiv = document.createElement('div');
             charDiv.className = 'info-item character-knowledge';
             charDiv.style.borderLeft = '4px solid #6495ed';
+            charDiv.style.cursor = 'pointer';
+            charDiv.style.minHeight = '80px'; // Ensure minimum dimensions
+            charDiv.style.display = 'block'; // Ensure it's a block element
+            charDiv.style.width = '100%'; // Ensure it takes full width
+            
+            // Simplified character display
+            const char = character.character;
+            const personalityHint = char.personalityTrait ? 
+                char.personalityTrait.trait : 
+                char.personality || 'Unknown';
+            
+            // Show only the most obvious relationship
+            let primaryRelationship = '';
+            if (char.relationships && char.relationships.length > 0) {
+                const obviousRel = char.relationships.find(rel => 
+                    ['spouse', 'business_partner', 'enemy'].includes(rel.relationshipType)
+                );
+                if (obviousRel) {
+                    primaryRelationship = ` • ${obviousRel.relationshipType} of ${obviousRel.targetName}`;
+                }
+            }
+            
             charDiv.innerHTML = `
-                <div><strong>${character.name}</strong> - ${character.character.profession}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${character.name}</strong> - ${char.profession}<br>
                 <div style="font-size: 0.9em; color: #ccc;">
-                    ${character.character.personality} | 
-                    Relationship: ${character.relationshipLevel} | 
-                    ${character.knownInfo.length} facts learned
+                            ${personalityHint}${primaryRelationship}
+                        </div>
+                    </div>
+                    <div style="text-align: right; font-size: 0.8em; color: #daa520;">
+                        ${character.relationshipLevel}<br>
+                        <span style="color: #ccc;">${character.knownInfo.length} facts</span>
+                    </div>
+                </div>
+                <div style="font-size: 0.8em; color: #6495ed; margin-top: 8px; text-align: center;">
+                    📖 Click for full details
                 </div>
             `;
+            
+            // Add data attribute for event delegation
+            charDiv.setAttribute('data-character-name', character.name);
+            charDiv.setAttribute('data-character-card', 'true');
+            
+            console.log('Character card created for:', character.name);
             infoList.appendChild(charDiv);
         });
         infoList.innerHTML += '<br>';
@@ -903,6 +3564,26 @@ function updateUI() {
         const needed = 3 - gameState.gatheredInfo.length;
         eveningBtn.innerHTML = `🌙 Need ${needed} more conversation${needed > 1 ? 's' : ''}`;
     }
+    
+    // Update rumor list
+    const rumorList = document.getElementById('rumor-list');
+    if (rumorList) {
+        rumorList.innerHTML = '';
+        const discoveredRumors = gameState.knownRumors.filter(r => r.discovered);
+        if (discoveredRumors.length === 0) {
+            rumorList.innerHTML = '<p style="color: #ccc; font-style: italic;">No rumors heard yet. Talk to people and explore to learn what\'s going on in town.</p>';
+        } else {
+            discoveredRumors.forEach(rumor => {
+                const rumorDiv = document.createElement('div');
+                rumorDiv.className = 'rumor-item';
+                rumorDiv.innerHTML = `
+                    <div>${rumor.description}</div>
+                    <div class="rumor-source">Source: ${rumor.source} (Day ${rumor.dayAdded})</div>
+                `;
+                rumorList.appendChild(rumorDiv);
+            });
+        }
+    }
 }
 
 function updateTownDisplay(townInfo) {
@@ -924,15 +3605,25 @@ function updateTownDisplay(townInfo) {
 
 function updateLocationsDisplay() {
     const container = document.getElementById('locations-container');
-    if (!container || !locations) return;
+    if (!container || !locations) {
+        if (container) {
+            container.innerHTML = '<p style="color: #999; font-style: italic;">Locations are being generated...</p>';
+        }
+        return;
+    }
     
     container.innerHTML = '';
     
     // Create location elements for each generated location
     Object.keys(locations).forEach(locationKey => {
-        if (locationKey === 'townInfo') return; // Skip town info
+        if (locationKey === 'townInfo' || locationKey === 'allNPCs') return; // Skip metadata
         
         const location = locations[locationKey];
+        if (!location) {
+            console.warn(`Location ${locationKey} is undefined`);
+            return;
+        }
+        
         const locationDiv = document.createElement('div');
         locationDiv.className = 'location';
         locationDiv.onclick = () => visitLocation(locationKey);
@@ -941,7 +3632,7 @@ function updateLocationsDisplay() {
         const shortDescription = getShortLocationDescription(location, locationKey);
         
         locationDiv.innerHTML = `
-            <h4>${location.name}</h4>
+            <h4>${location.name || 'Unknown Location'}</h4>
             <p>${shortDescription}</p>
         `;
         
@@ -987,14 +3678,51 @@ function visitLocation(locationKey) {
         
         contentHTML += '<h4>People you can talk to:</h4>';
         
-        location.npcs.forEach((npc, index) => {
+        // Check if location has NPCs
+        if (!location.npcs || location.npcs.length === 0) {
+            contentHTML += '<p style="color: #999; font-style: italic;">This location appears to be empty at the moment.</p>';
+        } else {
+            location.npcs.forEach((npc, index) => {
             const alreadyTalked = gameState.talkedToToday.includes(npc.name);
             const conversationsRemaining = gameState.maxConversationsPerDay - gameState.conversationsUsed;
             const canTalk = !alreadyTalked && conversationsRemaining > 0;
             
+            // Enhanced NPC display with observable characteristics
+            const char = npc.character;
+            const observableTraits = [];
+            
+            // Add observable personality traits
+            if (char.personalityTrait) {
+                observableTraits.push(`${char.personalityTrait.trait}`);
+            }
+            
+            // Add emotional state if noticeable
+            if (char.psychologicalProfile && ['troubled', 'anxious', 'optimistic'].includes(char.psychologicalProfile.emotionalState)) {
+                observableTraits.push(`appears ${char.psychologicalProfile.emotionalState}`);
+            }
+            
+            // Add age and profession
+            observableTraits.push(`${char.age} ${char.profession}`);
+            
+            // Show hints about relationships if they're obvious
+            let relationshipHints = '';
+            if (char.relationships) {
+                const obviousRels = char.relationships.filter(rel => 
+                    ['spouse', 'business_partner', 'enemy'].includes(rel.relationshipType)
+                );
+                if (obviousRels.length > 0) {
+                    const relDesc = obviousRels.map(rel => 
+                        `${rel.relationshipType} of ${rel.targetName}`
+                    ).join(', ');
+                    relationshipHints = `<div style="font-size: 0.8em; color: #daa520; margin-top: 5px;">👥 Known to be: ${relDesc}</div>`;
+                }
+            }
+            
             contentHTML += `
                 <div class="npc-option" style="margin: 10px 0; padding: 10px; background: rgba(139, 69, 19, 0.3); border-radius: 5px;">
                     <strong>${npc.name}</strong>
+                    <div style="font-size: 0.9em; color: #ccc; margin: 5px 0;">${observableTraits.join(' • ')}</div>
+                    ${relationshipHints}
                     <p style="margin: 5px 0; font-style: italic;">"${npc.dialogue}"</p>
                     ${alreadyTalked ? 
                         '<p style="color: #32cd32;">✓ Already spoke with them today</p>' : 
@@ -1006,6 +3734,7 @@ function visitLocation(locationKey) {
                 </div>
             `;
         });
+        }
     }
     
     content.innerHTML = contentHTML;
@@ -1071,14 +3800,57 @@ function talkToNPC(locationKey, npcIndex) {
     // Add info to gathered information (daily)
     gameState.gatheredInfo.push(npc.info);
     
-    // Add character to persistent knowledge base
+    // If the info is a rumor and not already in knownRumors, add it as a discovered rumor
+    if (npc.info.type === 'rumored') {
+        const alreadyKnown = gameState.knownRumors.some(r => r.description === npc.info.text);
+        if (!alreadyKnown) {
+            gameState.knownRumors.push({
+                id: `rumor_${Date.now()}_${Math.random()}`,
+                description: npc.info.text,
+                type: 'npc', // or 'location' if you want to be more specific
+                target: npc.name,
+                discovered: true,
+                dayAdded: gameState.day,
+                source: npc.name,
+                thread: []
+            });
+        }
+    }
+    
+    // Add character to persistent knowledge base with LIMITED initial information
     if (!gameState.knownCharacters[npc.name]) {
         gameState.knownCharacters[npc.name] = {
             name: npc.name,
             location: locationKey,
             firstMet: gameState.day,
             conversationsHad: 0,
-            character: npc.character ? { ...npc.character } : { profession: 'Unknown', personality: 'Unknown', storyPreferences: { themes: [], truthLevel: 'confirmed', tone: 'neutral', bonusPreferences: [] } }, // Deep copy character info with fallback
+            // Only store basic observable information initially
+            character: {
+                profession: npc.character.profession,
+                age: npc.character.age,
+                appearance: npc.character.appearance,
+                // Only surface-level personality impression
+                personalityTrait: {
+                    trait: npc.character.personalityTrait ? npc.character.personalityTrait.trait : 'Hard to read',
+                    description: 'Your initial impression of their character'
+                },
+                // Only obvious relationships (public knowledge)
+                relationships: npc.character.relationships ? 
+                    npc.character.relationships.filter(rel => 
+                        ['spouse', 'business_partner', 'enemy'].includes(rel.relationshipType)
+                    ) : [],
+                // Hidden until closer relationship
+                backstory: null,
+                secrets: [],
+                skill: null,
+                flaw: null,
+                currentSituation: null,
+                familyStructure: null,
+                psychologicalProfile: null,
+                storyPreferences: npc.character.storyPreferences || { themes: [], truthLevel: 'confirmed', tone: 'neutral', bonusPreferences: [] }
+            },
+            // Store the FULL character data separately for gradual revelation
+            _fullCharacterData: npc.character ? { ...npc.character } : null,
             knownInfo: [],
             relationshipLevel: 'acquaintance' // acquaintance -> friend -> confidant
         };
@@ -1086,6 +3858,7 @@ function talkToNPC(locationKey, npcIndex) {
     
     // Update character knowledge
     const character = gameState.knownCharacters[npc.name];
+    const oldRelationshipLevel = character.relationshipLevel;
     character.conversationsHad++;
     character.lastSeen = gameState.day;
     
@@ -1100,6 +3873,11 @@ function talkToNPC(locationKey, npcIndex) {
         character.relationshipLevel = 'friend';
     } else if (character.conversationsHad >= 5 && character.relationshipLevel === 'friend') {
         character.relationshipLevel = 'confidant';
+    }
+    
+    // Reveal new character information if relationship level improved
+    if (character.relationshipLevel !== oldRelationshipLevel) {
+        revealCharacterInformation(character);
     }
     
     // Track that we've talked to this NPC today
@@ -1123,6 +3901,86 @@ function talkToNPC(locationKey, npcIndex) {
     showConversationResults(npc, character);
 }
 
+// Gradually reveal character information as relationships deepen
+function revealCharacterInformation(character) {
+    const fullData = character._fullCharacterData;
+    if (!fullData) return;
+    
+    switch (character.relationshipLevel) {
+        case 'friend':
+            // Friends level: Learn more personal details
+            character.character.personalityTrait = {
+                trait: fullData.personalityTrait.trait,
+                description: fullData.personalityTrait.description
+            };
+            
+            // Learn about their obvious skill or notable trait
+            if (fullData.skill) {
+                character.character.skill = fullData.skill;
+            }
+            
+            // Learn about some of their relationships (close friends, family)
+            if (fullData.relationships) {
+                const friendLevelRels = fullData.relationships.filter(rel => 
+                    ['close_friend', 'best_friend', 'sibling', 'parent', 'child'].includes(rel.relationshipType)
+                );
+                character.character.relationships = [
+                    ...character.character.relationships,
+                    ...friendLevelRels.slice(0, 2) // Max 2 additional relationships
+                ];
+            }
+            
+            // Learn about their current situation if it's not too personal
+            if (fullData.currentSituation && fullData.currentSituation.stress_level <= 2) {
+                character.character.currentSituation = fullData.currentSituation;
+            }
+            
+            break;
+            
+        case 'confidant':
+            // Confidant level: Learn deeper secrets and backstory
+            if (fullData.backstory) {
+                // Reveal some major life events (not all at once)
+                character.character.backstory = {
+                    lifeEvents: fullData.backstory.lifeEvents.slice(0, 2), // First 2 events
+                    connections: fullData.backstory.connections
+                };
+            }
+            
+            // Learn about their flaw/vulnerability
+            if (fullData.flaw) {
+                character.character.flaw = fullData.flaw;
+            }
+            
+            // Learn about more relationships
+            if (fullData.relationships) {
+                character.character.relationships = [...fullData.relationships];
+            }
+            
+            // Learn about their psychological profile
+            if (fullData.psychologicalProfile) {
+                character.character.psychologicalProfile = fullData.psychologicalProfile;
+            }
+            
+            // Learn about their family background
+            if (fullData.familyStructure) {
+                character.character.familyStructure = fullData.familyStructure;
+            }
+            
+            // Learn about stressful current situations
+            if (fullData.currentSituation) {
+                character.character.currentSituation = fullData.currentSituation;
+            }
+            
+            // Reveal one secret (if they have any)
+            if (fullData.secrets && fullData.secrets.length > 0) {
+                character.character.secrets = [fullData.secrets[0]]; // Just one secret
+            }
+            
+            break;
+    }
+}
+
 function showConversationResults(npc, character) {
     const modal = document.getElementById('conversation-modal');
     const results = document.getElementById('conversation-results');
@@ -1135,9 +3993,23 @@ function showConversationResults(npc, character) {
     // Determine relationship improvement message
     let relationshipChange = '';
     if (character.conversationsHad === 3 && character.relationshipLevel === 'friend') {
-        relationshipChange = '<div style="color: #32cd32; font-weight: bold; margin-top: 10px;">🎉 You\'ve become friends!</div>';
+        relationshipChange = `
+            <div style="color: #32cd32; font-weight: bold; margin-top: 10px;">
+                🎉 You've become friends!
+                <div style="font-size: 0.9em; font-weight: normal; color: #ccc; margin-top: 5px;">
+                    They're more comfortable sharing personal details with you now.
+                </div>
+            </div>
+        `;
     } else if (character.conversationsHad === 5 && character.relationshipLevel === 'confidant') {
-        relationshipChange = '<div style="color: #daa520; font-weight: bold; margin-top: 10px;">⭐ They now consider you a close confidant!</div>';
+        relationshipChange = `
+            <div style="color: #daa520; font-weight: bold; margin-top: 10px;">
+                ⭐ They now consider you a close confidant!
+                <div style="font-size: 0.9em; font-weight: normal; color: #ccc; margin-top: 5px;">
+                    They trust you enough to share their deepest secrets and experiences.
+                </div>
+            </div>
+        `;
     }
     
     // Get information quality indicator
@@ -1155,18 +4027,37 @@ function showConversationResults(npc, character) {
     
     const conversationsRemaining = gameState.maxConversationsPerDay - gameState.conversationsUsed;
     
+    // Simple character display - only what you'd observe in a brief conversation
+    const char = npc.character;
+    const personalityHint = char.personalityTrait ? 
+        char.personalityTrait.trait : 
+        char.personality || 'Hard to read';
+    
+    // Only show obvious relationships (spouse, business partner, enemy)
+    let obviousRelationship = '';
+    if (char.relationships) {
+        const publicRel = char.relationships.find(rel => 
+            ['spouse', 'business_partner', 'enemy'].includes(rel.relationshipType)
+        );
+        if (publicRel) {
+            obviousRelationship = `<div style="font-size: 0.9em; color: #daa520; margin-top: 8px;">👥 ${publicRel.relationshipType} of ${publicRel.targetName}</div>`;
+        }
+    }
+    
     results.innerHTML = `
         <div style="text-align: center; margin-bottom: 20px;">
             <div style="background: rgba(139, 69, 19, 0.3); border-radius: 10px; padding: 20px; margin-bottom: 15px;">
-                <h3 style="color: #daa520; margin-bottom: 15px;">📖 You spoke with ${npc.name}</h3>
+                <h3 style="color: #daa520; margin-bottom: 15px;">💬 You spoke with ${npc.name}</h3>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="text-align: left;">
-                        <strong>Profession:</strong> ${npc.character.profession}<br>
-                        <strong>Personality:</strong> ${npc.character.personality}
+                        <strong>${char.profession}</strong> • ${char.age}<br>
+                        <div style="font-style: italic; color: #ccc; margin-top: 5px;">"${personalityHint}"</div>
+                        ${obviousRelationship}
                     </div>
                     <div style="text-align: right; color: #daa520;">
                         <strong>Relationship:</strong><br>
-                        ${character.relationshipLevel} (${character.conversationsHad} conversations)
+                        ${character.relationshipLevel}<br>
+                        <span style="font-size: 0.9em;">(${character.conversationsHad} conversations)</span>
                     </div>
                 </div>
                 <div style="text-align: center;">
@@ -1187,6 +4078,12 @@ function showConversationResults(npc, character) {
             
             <div style="margin-top: 15px; padding: 10px; background: rgba(255, 165, 0, 0.1); border-radius: 5px;">
                 💬 <strong>Conversations remaining today:</strong> ${conversationsRemaining}/${gameState.maxConversationsPerDay}
+            </div>
+            
+            <div style="margin-top: 10px;">
+                <button onclick="showCharacterDetails('${npc.name}')" style="padding: 8px 16px; background: rgba(100, 149, 237, 0.3); border: 1px solid #6495ed; border-radius: 5px; color: #f4e4c1;">
+                    📖 View Character Details
+                </button>
             </div>
         </div>
     `;
@@ -1211,6 +4108,243 @@ function showConversationResults(npc, character) {
     }
     
     modal.classList.remove('hidden');
+}
+
+// Character Details Encyclopedia - Shows full character information
+function showCharacterDetails(characterName) {
+    console.log('showCharacterDetails called for:', characterName);
+    
+    // Find character in known characters or current locations
+    let targetCharacter = null;
+    
+    // Check known characters first
+    if (gameState.knownCharacters[characterName]) {
+        targetCharacter = gameState.knownCharacters[characterName];
+        console.log('Found character in knownCharacters:', targetCharacter);
+    }
+    
+    // If not found, check current location NPCs
+    if (!targetCharacter && locations && locations.allNPCs) {
+        const foundNPC = locations.allNPCs.find(npc => npc.name === characterName);
+        if (foundNPC) {
+            targetCharacter = foundNPC;
+            console.log('Found character in allNPCs:', targetCharacter);
+        }
+    }
+    
+    if (!targetCharacter) {
+        console.error('Character not found:', characterName);
+        console.log('Available known characters:', Object.keys(gameState.knownCharacters));
+        console.log('All NPCs:', locations?.allNPCs?.map(npc => npc.name) || 'No NPCs');
+        alert('Character information not available.');
+        return;
+    }
+    
+    console.log('About to create modal for character:', targetCharacter);
+    
+    // Remove any existing character details modal first
+    const existingModal = document.getElementById('character-details-modal');
+    if (existingModal) {
+        existingModal.remove();
+        console.log('Removed existing modal');
+    }
+    
+    // Create character details modal
+    const detailsModal = document.createElement('div');
+    detailsModal.className = 'modal';
+    detailsModal.id = 'character-details-modal';
+    detailsModal.style.display = 'block';
+    
+    const char = targetCharacter.character;
+    const personalityDisplay = char.personalityTrait ? 
+        `${char.personalityTrait.trait} - ${char.personalityTrait.description}` : 
+        'Unknown personality';
+    
+    const emotionalState = char.psychologicalProfile ? 
+        char.psychologicalProfile.emotionalState : 
+        (targetCharacter.relationshipLevel === 'acquaintance' ? 'Hard to read' : 'Unknown');
+        
+    const skillDisplay = char.skill ? 
+        `${char.skill.skill} - ${char.skill.description}` : 
+        (targetCharacter.relationshipLevel === 'acquaintance' ? 'Not yet observed' : 'No notable skills discovered');
+        
+    const flawDisplay = char.flaw ? 
+        `${char.flaw.flaw} - ${char.flaw.description}` : 
+        (targetCharacter.relationshipLevel === 'confidant' ? 'No obvious flaws observed' : 'They haven\'t revealed their vulnerabilities yet');
+    
+    // Display relationships
+    let relationshipDisplay = '';
+    if (char.relationships && char.relationships.length > 0) {
+        const significantRels = char.relationships.filter(rel => rel.intensity >= 2);
+        if (significantRels.length > 0) {
+            relationshipDisplay = `
+                <div style="margin-top: 15px; padding: 15px; background: rgba(75, 0, 130, 0.1); border-radius: 8px;">
+                    <h4 style="color: #daa520; margin-bottom: 10px;">👥 Known Relationships:</h4>
+                    ${significantRels.map(rel => `
+                        <div style="margin: 8px 0; font-size: 0.9em; border-left: 3px solid #6495ed; padding-left: 10px;">
+                            <strong>${rel.targetName}</strong> - ${rel.relationshipType} (${rel.quality})<br>
+                            <div style="font-size: 0.8em; color: #ccc; font-style: italic; margin-top: 3px;">${rel.history}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+    }
+    
+    // Display backstory events (only if known)
+    let backstoryDisplay = '';
+    if (char.backstory && char.backstory.lifeEvents && char.backstory.lifeEvents.length > 0) {
+        backstoryDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(139, 69, 19, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">📚 Life History:</h4>
+                ${char.backstory.lifeEvents.map(event => `
+                    <div style="margin: 8px 0; font-size: 0.9em; border-left: 3px solid #daa520; padding-left: 10px;">
+                        <strong>${event.period.charAt(0).toUpperCase() + event.period.slice(1)}:</strong> ${event.event}
+                    </div>
+                `).join('')}
+                ${targetCharacter.relationshipLevel === 'confidant' && targetCharacter._fullCharacterData && targetCharacter._fullCharacterData.backstory && targetCharacter._fullCharacterData.backstory.lifeEvents.length > 2 ? 
+                    '<div style="font-size: 0.8em; color: #ccc; font-style: italic; margin-top: 10px;">As a trusted confidant, you sense there may be more to their story...</div>' : ''}
+            </div>
+        `;
+    } else if (targetCharacter.relationshipLevel === 'acquaintance') {
+        backstoryDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(139, 69, 19, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">📚 Life History:</h4>
+                <div style="font-size: 0.9em; color: #999; font-style: italic;">
+                    You don't know them well enough yet to learn about their past.
+                </div>
+            </div>
+        `;
+    }
+    
+    // Display current situation (only if known)
+    let situationDisplay = '';
+    if (char.currentSituation) {
+        situationDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(255, 165, 0, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">🎯 Current Situation:</h4>
+                <div style="margin: 8px 0; font-size: 0.9em;">
+                    ${char.currentSituation.situation}
+                    <div style="font-size: 0.8em; color: #ccc; margin-top: 5px;">
+                        Stress Level: ${'⭐'.repeat(char.currentSituation.stress_level)}${'☆'.repeat(3 - char.currentSituation.stress_level)} 
+                        | Time Commitment: ${char.currentSituation.time_commitment}
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (targetCharacter.relationshipLevel === 'acquaintance') {
+        situationDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(255, 165, 0, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">🎯 Current Situation:</h4>
+                <div style="font-size: 0.9em; color: #999; font-style: italic;">
+                    They haven't shared details about their personal life with you yet.
+                </div>
+            </div>
+        `;
+    }
+    
+    // Display family structure (only if known)
+    let familyDisplay = '';
+    if (char.familyStructure) {
+        familyDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(34, 139, 34, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">👨‍👩‍👧‍👦 Family Background:</h4>
+                <div style="margin: 8px 0; font-size: 0.9em;">
+                    <strong>Family Type:</strong> ${char.familyStructure.type}<br>
+                    <div style="font-size: 0.8em; color: #ccc; margin-top: 5px; font-style: italic;">${char.familyStructure.dynamics}</div>
+                </div>
+            </div>
+        `;
+    } else if (targetCharacter.relationshipLevel !== 'confidant') {
+        familyDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(34, 139, 34, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">👨‍👩‍👧‍👦 Family Background:</h4>
+                <div style="font-size: 0.9em; color: #999; font-style: italic;">
+                    They haven't opened up about their family yet.
+                </div>
+            </div>
+        `;
+    }
+    
+    // Display secrets (only for confidants)
+    let secretsDisplay = '';
+    if (char.secrets && char.secrets.length > 0 && targetCharacter.relationshipLevel === 'confidant') {
+        secretsDisplay = `
+            <div style="margin-top: 15px; padding: 15px; background: rgba(128, 0, 128, 0.1); border-radius: 8px;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">🤐 Shared Secrets:</h4>
+                ${char.secrets.map(secret => `
+                    <div style="margin: 8px 0; font-size: 0.9em; border-left: 3px solid #8b4513; padding-left: 10px; color: #ddd;">
+                        ${secret}
+                    </div>
+                `).join('')}
+                <div style="font-size: 0.8em; color: #999; font-style: italic; margin-top: 10px;">
+                    They trust you enough to share this personal information.
+                </div>
+            </div>
+        `;
+    }
+    
+    detailsModal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <span class="close" onclick="closeCharacterDetails()">&times;</span>
+            <h2 style="color: #daa520; text-align: center; margin-bottom: 20px;">📖 Character Encyclopedia: ${characterName}</h2>
+            
+            <div style="background: rgba(100, 149, 237, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: center;">
+                <div style="font-size: 0.9em; color: #ddd;">
+                    <strong>Relationship Level:</strong> <span style="color: #daa520;">${targetCharacter.relationshipLevel}</span>
+                    ${targetCharacter.relationshipLevel === 'acquaintance' ? 
+                        '<div style="margin-top: 5px; font-size: 0.8em; color: #ccc; font-style: italic;">Talk more to learn deeper details about their life</div>' : 
+                        targetCharacter.relationshipLevel === 'friend' ? 
+                            '<div style="margin-top: 5px; font-size: 0.8em; color: #ccc; font-style: italic;">They share personal details with you • Continue building trust to learn their secrets</div>' :
+                            '<div style="margin-top: 5px; font-size: 0.8em; color: #ccc; font-style: italic;">They trust you with their deepest secrets and experiences</div>'
+                    }
+                </div>
+            </div>
+            
+            <div style="background: rgba(139, 69, 19, 0.3); border-radius: 10px; padding: 20px; margin-bottom: 15px;">
+                <h3 style="color: #daa520; margin-bottom: 15px;">Basic Information</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <strong>Profession:</strong> ${char.profession}<br>
+                        <strong>Age:</strong> ${char.age}<br>
+                        <strong>Personality:</strong> ${personalityDisplay}
+                    </div>
+                    <div>
+                        <strong>Emotional State:</strong> ${emotionalState}<br>
+                        <strong>Notable Skill:</strong> ${skillDisplay}<br>
+                        <strong>Personal Flaw:</strong> ${flawDisplay}
+                    </div>
+                </div>
+            </div>
+            
+            ${situationDisplay}
+            ${backstoryDisplay}
+            ${familyDisplay}
+            ${secretsDisplay}
+            ${relationshipDisplay}
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="closeCharacterDetails()" style="padding: 12px 24px; font-size: 1.1em;">
+                    📖 Close Encyclopedia
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(detailsModal);
+    console.log('Modal added to DOM:', detailsModal);
+    console.log('Modal display style:', detailsModal.style.display);
+}
+
+function closeCharacterDetails() {
+    console.log('closeCharacterDetails called');
+    const modal = document.getElementById('character-details-modal');
+    if (modal) {
+        console.log('Removing modal:', modal);
+        modal.remove();
+    } else {
+        console.log('No modal found to close');
+    }
 }
 
 function closeConversationModal() {
@@ -1260,8 +4394,19 @@ function generateEveningAudience() {
         const professionBonus = character.character.profession.toLowerCase().includes('barkeep') ? 0.4 : 0;
         
         if (Math.random() < (chance + professionBonus)) {
+            // Get the full character data including relationships
+            const fullCharacterData = character._fullCharacterData || character.character;
+            
             audience.push({
                 ...character,
+                character: {
+                    ...character.character,
+                    // Include relationships for story reaction calculations
+                    relationships: fullCharacterData.relationships || [],
+                    secrets: fullCharacterData.secrets || [],
+                    personalityTrait: fullCharacterData.personalityTrait || character.character.personalityTrait,
+                    psychologicalProfile: fullCharacterData.psychologicalProfile || character.character.psychologicalProfile
+                },
                 mood: generateAudienceMood(character)
             });
         }
@@ -1270,12 +4415,18 @@ function generateEveningAudience() {
     // Fill out audience with unnamed patrons if needed
     while (audience.length < minAudience) {
                     const unnamedPatronPersonality = randomChoice(characterGen.personalities);
+        const personalityTrait = randomChoice(backstoryGen.personalityTraits.primary);
+        
             audience.push({
                 name: 'Unnamed Patron',
                 character: {
                     profession: 'Local resident',
-                    personality: unnamedPatronPersonality,
-                    storyPreferences: generateStoryPreferences(unnamedPatronPersonality, 'Local resident')
+                personality: unnamedPatronPersonality, // Keep old system for fallback
+                personalityTrait: personalityTrait, // Add new system
+                storyPreferences: generateStoryPreferences(unnamedPatronPersonality, 'Local resident'),
+                psychologicalProfile: {
+                    emotionalState: 'stable'
+                }
                 },
                 mood: 'neutral',
                 relationshipLevel: 'stranger'
@@ -1298,15 +4449,50 @@ function generateAudienceMood(character) {
         moodWeights = [0.4, 0.4, 0.2, 0.0, 0.0]; // Very positive
     }
     
-    // Adjust based on personality
-    if (character.character.personality.includes('Friendly') || character.character.personality.includes('Cheerful')) {
+    // Adjust based on personality traits (updated for new character system)
+    const personalityTrait = character.character.personalityTrait ? character.character.personalityTrait.trait : '';
+    const oldPersonality = character.character.personality || ''; // Fallback for old system
+    
+    // Check new personality traits
+    if (personalityTrait.includes('Gentle Nurturer') || personalityTrait.includes('Stalwart Protector') || 
+        personalityTrait.includes('Curious Scholar') || oldPersonality.includes('Friendly') || oldPersonality.includes('Cheerful')) {
         moodWeights[0] += 0.1; // More enthusiastic
-        moodWeights[4] -= 0.1; // Less skeptical
+        moodWeights[4] = Math.max(0, moodWeights[4] - 0.1); // Less skeptical
     }
     
-    if (character.character.personality.includes('Suspicious') || character.character.personality.includes('Bitter')) {
+    if (personalityTrait.includes('Passionate Revolutionary') || personalityTrait.includes('Wounded Healer') ||
+        oldPersonality.includes('Suspicious') || oldPersonality.includes('Bitter')) {
         moodWeights[4] += 0.1; // More skeptical
-        moodWeights[0] -= 0.1; // Less enthusiastic
+        moodWeights[0] = Math.max(0, moodWeights[0] - 0.1); // Less enthusiastic
+    }
+    
+    // Adjust based on emotional state
+    if (character.character.psychologicalProfile) {
+        const emotionalState = character.character.psychologicalProfile.emotionalState;
+        switch(emotionalState) {
+            case 'optimistic':
+                moodWeights[0] += 0.15; // Very enthusiastic
+                moodWeights[4] = Math.max(0, moodWeights[4] - 0.1);
+                break;
+            case 'content':
+                moodWeights[1] += 0.1; // More attentive
+                break;
+            case 'troubled':
+                moodWeights[3] += 0.15; // More distracted
+                moodWeights[0] = Math.max(0, moodWeights[0] - 0.1);
+                break;
+            case 'anxious':
+                moodWeights[4] += 0.1; // More skeptical
+                moodWeights[3] += 0.1; // More distracted
+                moodWeights[0] = Math.max(0, moodWeights[0] - 0.1);
+                break;
+        }
+    }
+    
+    // Adjust based on current life situation stress
+    if (character.character.currentSituation && character.character.currentSituation.stress_level >= 3) {
+        moodWeights[3] += 0.1; // More distracted when stressed
+        moodWeights[1] = Math.max(0, moodWeights[1] - 0.1); // Less attentive
     }
     
     // Weighted random selection
@@ -1343,15 +4529,23 @@ function displayAudience() {
                 'Unknown preferences';
         }
         
-        // Show less detail for strangers
+        // Show less detail for strangers - updated for new character system
         const personalityDisplay = audienceMember.relationshipLevel === 'stranger' ? 
-            'Unknown personality' : audienceMember.character.personality;
+            'Unknown personality' : 
+            (audienceMember.character.personalityTrait ? 
+                audienceMember.character.personalityTrait.trait : 
+                audienceMember.character.personality || 'Unknown personality');
+        
+        // Show emotional state if known
+        const emotionalState = audienceMember.character.psychologicalProfile && 
+                               audienceMember.relationshipLevel !== 'stranger' ?
+                               ` (${audienceMember.character.psychologicalProfile.emotionalState})` : '';
             
         memberDiv.innerHTML = `
             <div class="audience-member-info">
                 <strong>${audienceMember.name}</strong> (${audienceMember.mood})
                 <div class="audience-member-details">
-                    ${audienceMember.character.profession} - ${personalityDisplay}
+                    ${audienceMember.character.profession} - ${personalityDisplay}${emotionalState}
                 </div>
                 <div class="audience-preferences">${preferenceText}</div>
                 ${audienceMember.relationshipLevel !== 'stranger' ? 
@@ -1365,492 +4559,723 @@ function displayAudience() {
 }
 
 function generateStoryChoices() {
-    // Clear previous story characters to start fresh
+    // Clear previous story data to start fresh
     gameState.storyCharacters = null;
+    gameState.storyChoices = {};
     gameState.act1ChoiceData = {};
-    generateAct1Choices();
+    
+    // Start with Phase 1 only
+    generateCharacterSelectionChoices();
 }
 
-function generateAct1Choices() {
-    const choices = document.getElementById('act1-choices');
-    if (!choices) {
-        console.error('Could not find act1-choices element');
+// New Story Creation System - Phase 1: Character Selection
+function generateCharacterSelectionChoices() {
+    const act1Choices = document.getElementById('act1-choices');
+    act1Choices.innerHTML = '<h3>Phase 1: Choose Your Target Audience</h3><p style="color: #ccc; font-style: italic;">Select someone from tonight\'s audience you want to inspire with your story. Your tale will feature generic characters, but will be crafted to resonate with your chosen audience member.</p>';
+    
+    // Only show characters who are actually in tonight's audience
+    const eveningAudience = gameState.eveningAudience || [];
+    
+    // Filter to only show characters we know well enough to target (not strangers or unnamed patrons)
+    const availableTargets = eveningAudience.filter(char => 
+        char.relationshipLevel !== 'stranger' && 
+        char.name !== 'Unnamed Patron' &&
+        char.character && char.character.storyPreferences
+    );
+    
+    if (availableTargets.length === 0) {
+        // No familiar faces: allow general story
+        const generalDiv = document.createElement('div');
+        generalDiv.className = 'choice';
+        generalDiv.onclick = () => selectGeneralAudience();
+        generalDiv.innerHTML = `
+            <div class="choice-text">General Audience</div>
+            <div class="choice-source">Tell a story for the whole crowd (no specific target)</div>
+        `;
+        act1Choices.appendChild(generalDiv);
+        // Show selected if already chosen
+        if (gameState.storyChoices.targetAudience === 'general') {
+            const selectedDiv = document.createElement('div');
+            selectedDiv.className = 'target-selected';
+            selectedDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.2); border-radius: 8px; border-left: 4px solid #32cd32;';
+            selectedDiv.innerHTML = `
+                <h4 style=\"color: #32cd32; margin-bottom: 10px;\">✓ General Audience Selected</h4>
+                <div>This story will be crafted for the general crowd, not a specific person.</div>
+                <button onclick=\"clearTargetAudience()\" style=\"margin-top: 10px; padding: 5px 10px; font-size: 0.8em;\">Change Target</button>
+            `;
+            act1Choices.appendChild(selectedDiv);
+        }
         return;
     }
-    choices.innerHTML = '';
     
-    // Clear any stored choice-specific character data
-    gameState.act1ChoiceData = {};
+    // Add target audience selection
+    const targetSection = document.createElement('div');
+    targetSection.innerHTML = '<h4>Target Audience Member:</h4>';
     
-    // Generate choices based on gathered information and town type
-    const townType = locations && locations.townInfo ? locations.townInfo.type : 'mining';
-    const themes = ['industrial', 'market', 'tavern', 'government'];
-    
-    // Debug: Check if we have the required data
-    if (!gameState.gatheredInfo) {
-        console.error('gameState.gatheredInfo is undefined');
-        gameState.gatheredInfo = [];
-    }
-    
-    if (!gameState.knownCharacters) {
-        console.error('gameState.knownCharacters is undefined');
-        gameState.knownCharacters = {};
-    }
-    
-    // Create better profession-to-theme mapping
-    const professionThemeMap = {
-        'industrial': [
-            'former miner', 'mine guard', 'widow/widower', 'safety inspector', 'geologer', 'mine cart operator', 'guard captain',
-            'former fisherman', 'dock worker', 'ship builder', 'lighthouse keeper', 'harbor master', 'sea captain',
-            'mill worker', 'grain inspector', 'livestock handler', 'farm equipment maker', 'granary keeper', 'agricultural overseer'
-        ],
-        'market': ['baker', 'blacksmith', 'merchant', 'apprentice', 'farmer', 'weaver', 'butcher'],
-        'tavern': ['barkeep', 'serving wench', 'traveling bard', 'retired soldier', 'local drunk', 'tavern cook', 'merchant'],
-        'government': ['town clerk', 'guard captain', 'tax collector', 'council member', 'court scribe', 'mayor']
-    };
-    
-    themes.forEach(theme => {
-        const relevantInfo = gameState.gatheredInfo.filter(info => {
-            const sourceLower = info.source ? info.source.toLowerCase() : '';
-            const textLower = info.text ? info.text.toLowerCase() : '';
-            
-            // Check if source matches theme-associated professions
-            const sourceCharacter = Object.values(gameState.knownCharacters).find(char => 
-                char && char.name && char.name.toLowerCase() === sourceLower
-            );
-            
-            let matchesProfession = false;
-            if (sourceCharacter && sourceCharacter.character && sourceCharacter.character.profession && professionThemeMap[theme]) {
-                matchesProfession = professionThemeMap[theme].some(prof => 
-                    sourceCharacter.character.profession.toLowerCase().includes(prof.toLowerCase())
-                );
-            }
-            
-            // Check if text contains theme-related keywords
-            const themeKeywords = {
-                'industrial': ['mine', 'mining', 'accident', 'sealed', 'cave-in', 'miners', 'mill', 'dock', 'ship', 'fish'],
-                'market': ['market', 'trade', 'trading', 'merchant', 'business', 'bread', 'baker', 'blacksmith'],
-                'tavern': ['tavern', 'drinks', 'gossip', 'barkeep', 'travelers', 'ale', 'inn'],
-                'government': ['mayor', 'government', 'official', 'decree', 'meetings', 'capital', 'economic', 'clerk']
-            };
-            
-            let matchesKeywords = false;
-            if (themeKeywords[theme]) {
-                matchesKeywords = themeKeywords[theme].some(keyword => 
-                    textLower.includes(keyword) || sourceLower.includes(keyword)
-                );
-            }
-            
-            return matchesProfession || matchesKeywords || textLower.includes(theme);
-        });
+    availableTargets.slice(0, 8).forEach(char => {
+        const choiceDiv = document.createElement('div');
+        choiceDiv.className = 'choice';
+        choiceDiv.onclick = () => selectTargetAudience(char);
         
-        // Find characters associated with this theme by profession
-        const themeCharacters = Object.values(gameState.knownCharacters).filter(char => {
-            if (!char || !char.character || !char.character.profession || !professionThemeMap[theme]) {
-                return false;
-            }
-            return professionThemeMap[theme].some(prof => 
-                char.character.profession.toLowerCase().includes(prof.toLowerCase())
-            );
-        });
+        // Show what we know about this person that makes them a good target
+        const personalityHint = char.character.personalityTrait ? char.character.personalityTrait.trait : 'Unknown personality';
+        const storyPrefs = char.character.storyPreferences || {};
+        const preferredThemes = storyPrefs.themes ? storyPrefs.themes.slice(0, 2).join(', ') : 'various themes';
+        const preferredTruthLevel = storyPrefs.truthLevel || 'any truth level';
         
-        ['confirmed', 'rumored', 'madeUp'].forEach(type => {
-            const choice = document.createElement('div');
-            choice.className = 'choice';
-            choice.onclick = () => selectChoice('act1', theme, type);
-            
-            const hasInfo = type === 'madeUp' || relevantInfo.some(info => info.type === type);
-            
-            // Generate the characters that will be used for this specific choice
-            const choiceCharacters = generateCharactersForChoice(theme, type, themeCharacters);
-            
-            // Store character data for this specific choice
-            const choiceKey = `${theme}-${type}`;
-            gameState.act1ChoiceData[choiceKey] = choiceCharacters;
-            
-            // Create personalized story text with character names
-            let choiceText = generatePersonalizedStoryText(theme, type, themeCharacters, relevantInfo.filter(info => info.type === type || type === 'madeUp'));
-            
-            // Show which specific info is available
-            let sourceInfo = 'Your imagination';
-            if (type !== 'madeUp') {
-                const availableInfo = relevantInfo.filter(info => info.type === type);
-                if (availableInfo.length > 0) {
-                    const sources = [...new Set(availableInfo.map(info => info.source))];
-                    sourceInfo = `${type} information about: ${sources.join(', ')}`;
-                } else {
-                    sourceInfo = `No ${type} information available`;
-                }
-            } else if (themeCharacters.length > 0) {
-                sourceInfo = `Your imagination + known characters: ${themeCharacters.map(c => c.name).join(', ')}`;
-            }
-            
-            choice.innerHTML = `
-                <div class="choice-text">${choiceText}</div>
-                <div class="choice-source">Based on: ${sourceInfo}</div>
-            `;
-            
-            // Style choices based on available information
-            if (type !== 'madeUp' && !hasInfo) {
-                choice.style.opacity = '0.6';
-                choice.style.borderColor = '#666';
-            }
-            
-            choices.appendChild(choice);
-        });
-    });
-}
-
-function generateCharactersForChoice(theme, type, themeCharacters) {
-    // Use the EXACT same logic as generatePersonalizedStoryText to ensure consistency
-    const allKnownCharacters = Object.values(gameState.knownCharacters || {});
-    const townInfo = (locations && locations.townInfo) ? locations.townInfo : { name: 'this town', type: 'mining' };
-    
-    // Find specific characters for different story roles (EXACT copy of generatePersonalizedStoryText logic)
-    const findCharacterForRole = (roleTypes, characteristics = [], excludeList = []) => {
-        // First try theme-specific characters
-        let candidates = themeCharacters.filter(char => 
-            char && char.character && char.character.profession &&
-            roleTypes.some(role => char.character.profession.toLowerCase().includes(role.toLowerCase())) &&
-            !excludeList.includes(char) // Exclude already assigned characters
-        );
-        
-        // If no theme-specific matches, try all known characters
-        if (candidates.length === 0) {
-            candidates = allKnownCharacters.filter(char =>
-                char && char.character && char.character.profession &&
-                roleTypes.some(role => char.character.profession.toLowerCase().includes(role.toLowerCase())) &&
-                !excludeList.includes(char) // Exclude already assigned characters
-            );
-        }
-        
-        // Filter by characteristics if specified
-        if (characteristics.length > 0 && candidates.length > 1) {
-            const filtered = candidates.filter(char => 
-                characteristics.some(trait => 
-                    char.character.personality.toLowerCase().includes(trait.toLowerCase())
-                )
-            );
-            if (filtered.length > 0) candidates = filtered;
-        }
-        
-        return candidates.length > 0 ? candidates[0] : null;
-    };
-    
-    // Get a character for generic roles (with exclusion)
-    const getAnyKnownCharacter = (excludeList = []) => {
-        const available = allKnownCharacters.filter(char => !excludeList.includes(char));
-        return available.length > 0 ? available[0] : null;
-    };
-    
-    let protagonist = null;
-    let supportingChar = null;
-    let antagonist = null;
-    const usedCharacters = [];
-    
-    // Generate story-specific character assignments (same as generatePersonalizedStoryText)
-    if (theme === 'industrial') {
-        protagonist = findCharacterForRole(['former miner', 'mill worker', 'dock worker', 'former fisherman'], ['ambitious', 'determined'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['widow/widower', 'safety inspector', 'mine guard'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['guard captain', 'mayor'], ['suspicious', 'evasive'], usedCharacters);
-    } else if (theme === 'market') {
-        protagonist = findCharacterForRole(['baker', 'merchant', 'apprentice'], ['hardworking', 'ambitious'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['farmer', 'weaver', 'blacksmith'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['tax collector', 'traveling merchant'], ['greedy', 'scheming'], usedCharacters);
-    } else if (theme === 'tavern') {
-        protagonist = findCharacterForRole(['barkeep', 'traveling bard', 'serving wench'], ['friendly', 'talkative'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['retired soldier', 'local drunk', 'tavern cook'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['council member', 'guard captain'], ['stern', 'authoritarian'], usedCharacters);
-    } else if (theme === 'government') {
-        protagonist = findCharacterForRole(['town clerk', 'council member'], ['honest', 'concerned'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['court scribe', 'tax collector'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['mayor', 'guard captain'], ['corrupt', 'ambitious'], usedCharacters);
-    }
-    
-    // Fallback to any known character if specific roles not found (with exclusions)
-    if (!protagonist) {
-        protagonist = getAnyKnownCharacter(usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-    }
-    if (!supportingChar) {
-        supportingChar = getAnyKnownCharacter(usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-    }
-    if (!antagonist && allKnownCharacters.length > 2) {
-        antagonist = getAnyKnownCharacter(usedCharacters);
-    }
-    
-    return { protagonist, supportingChar, antagonist, townInfo };
-}
-
-function generatePersonalizedStoryText(theme, type, characters, availableInfo) {
-    // Get all known characters for potential story use
-    const allKnownCharacters = Object.values(gameState.knownCharacters || {});
-    const themeCharacters = characters && characters.length > 0 ? characters : [];
-    const townInfo = (locations && locations.townInfo) ? locations.townInfo : { name: 'this town', type: 'mining' };
-    
-    // Find specific characters for different story roles
-    const findCharacterForRole = (roleTypes, characteristics = [], excludeList = []) => {
-        // First try theme-specific characters
-        let candidates = themeCharacters.filter(char => 
-            char && char.character && char.character.profession &&
-            roleTypes.some(role => char.character.profession.toLowerCase().includes(role.toLowerCase())) &&
-            !excludeList.includes(char) // Exclude already assigned characters
-        );
-        
-        // If no theme-specific matches, try all known characters
-        if (candidates.length === 0) {
-            candidates = allKnownCharacters.filter(char =>
-                char && char.character && char.character.profession &&
-                roleTypes.some(role => char.character.profession.toLowerCase().includes(role.toLowerCase())) &&
-                !excludeList.includes(char) // Exclude already assigned characters
-            );
-        }
-        
-        // Filter by characteristics if specified
-        if (characteristics.length > 0 && candidates.length > 1) {
-            const filtered = candidates.filter(char => 
-                characteristics.some(trait => 
-                    char.character.personality.toLowerCase().includes(trait.toLowerCase())
-                )
-            );
-            if (filtered.length > 0) candidates = filtered;
-        }
-        
-        return candidates.length > 0 ? candidates[0] : null;
-    };
-    
-    // Get a character for generic roles (with exclusion to prevent self-reference)
-    const getAnyKnownCharacter = (excludeList = []) => {
-        const available = allKnownCharacters.filter(char => !excludeList.includes(char));
-        return available.length > 0 ? available[0] : null;
-    };
-    
-    // Generate story-specific character assignments
-    let protagonist = null;
-    let supportingChar = null;
-    let antagonist = null;
-    const usedCharacters = [];
-    
-    if (theme === 'industrial') {
-        protagonist = findCharacterForRole(['former miner', 'mill worker', 'dock worker', 'former fisherman'], ['ambitious', 'determined'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['widow/widower', 'safety inspector', 'mine guard'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['guard captain', 'mayor'], ['suspicious', 'evasive'], usedCharacters);
-    } else if (theme === 'market') {
-        protagonist = findCharacterForRole(['baker', 'merchant', 'apprentice'], ['hardworking', 'ambitious'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['farmer', 'weaver', 'blacksmith'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['tax collector', 'traveling merchant'], ['greedy', 'scheming'], usedCharacters);
-    } else if (theme === 'tavern') {
-        protagonist = findCharacterForRole(['barkeep', 'traveling bard', 'serving wench'], ['friendly', 'talkative'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['retired soldier', 'local drunk', 'tavern cook'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['council member', 'guard captain'], ['stern', 'authoritarian'], usedCharacters);
-    } else if (theme === 'government') {
-        protagonist = findCharacterForRole(['town clerk', 'council member'], ['honest', 'concerned'], usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-        
-        supportingChar = findCharacterForRole(['court scribe', 'tax collector'], [], usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-        
-        antagonist = findCharacterForRole(['mayor', 'guard captain'], ['corrupt', 'ambitious'], usedCharacters);
-    }
-    
-    // Fallback to any known character if specific roles not found (with exclusions)
-    if (!protagonist) {
-        protagonist = getAnyKnownCharacter(usedCharacters);
-        if (protagonist) usedCharacters.push(protagonist);
-    }
-    if (!supportingChar) {
-        supportingChar = getAnyKnownCharacter(usedCharacters);
-        if (supportingChar) usedCharacters.push(supportingChar);
-    }
-    if (!antagonist && allKnownCharacters.length > 2) {
-        antagonist = getAnyKnownCharacter(usedCharacters);
-    }
-    
-    // Create personalized story templates
-    const templates = {
-        industrial: {
-            confirmed: protagonist ? 
-                `In the heart of ${townInfo.name}, where ${protagonist.name} ${getCharacterAction(protagonist, 'works tirelessly despite the hardships')} that have befallen the community...` :
-                `In the abandoned workplaces of ${townInfo.name}, where hardworking people once built prosperity...`,
-            rumored: protagonist && supportingChar ?
-                `In the mysterious ruins of ${townInfo.name}, where ${protagonist.name} discovers secrets that ${supportingChar.name} whispers about in hushed tones...` :
-                `In the abandoned workplaces, where strange happenings preceded the disaster...`,
-            madeUp: protagonist ?
-                `In the enchanted realm of ${townInfo.name}, where ${protagonist.name} discovers magical powers hidden beneath the industrial ruins...` :
-                `In the mystical ruins, where ancient powers still linger...`
-        },
-        market: {
-            confirmed: protagonist ?
-                `In the market square of ${townInfo.name}, where ${protagonist.name} ${getCharacterAction(protagonist, 'struggles to maintain their trade')} despite economic hardship...` :
-                `In the market square, where merchants struggle with economic hardship...`,
-            rumored: protagonist && supportingChar ?
-                `In the bustling marketplace, where ${protagonist.name} overhears ${supportingChar.name} speaking of changes coming to ${townInfo.name}...` :
-                `In the market square, where whispers speak of transformation...`,
-            madeUp: protagonist ?
-                `In the enchanted marketplace of ${townInfo.name}, where ${protagonist.name} discovers magical goods that shimmer under starlight...` :
-                `In the enchanted marketplace, where magical goods are traded...`
-        },
-        tavern: {
-            confirmed: protagonist ?
-                `In the tavern of ${townInfo.name}, where ${protagonist.name} ${getCharacterAction(protagonist, 'serves drinks while listening to')} the town's secrets and sorrows...` :
-                `In the local tavern, where secrets flow with every drink...`,
-            rumored: protagonist && supportingChar ?
-                `In the shadowy tavern, where ${protagonist.name} notices ${supportingChar.name} whispering about mysterious happenings in ${townInfo.name}...` :
-                `In the tavern, where ghostly voices echo through the night...`,
-            madeUp: protagonist ?
-                `In the mystical tavern, where ${protagonist.name} communes with ancient spirits who share forgotten wisdom...` :
-                `In the mystical tavern, where ancient spirits gather...`
-        },
-        government: {
-            confirmed: protagonist ?
-                `In the halls of power in ${townInfo.name}, where ${protagonist.name} ${getCharacterAction(protagonist, 'witnesses the decisions')} that will shape the community's future...` :
-                `In the halls of power, where leaders make crucial decisions...`,
-            rumored: protagonist && antagonist ?
-                `In the government offices, where ${protagonist.name} discovers that ${antagonist.name} has been conducting secret meetings behind closed doors...` :
-                `In the government halls, where secret dealings occur...`,
-            madeUp: protagonist && antagonist ?
-                `In the grand palace, where ${protagonist.name} must outwit the scheming ${antagonist.name} through chambers of marble and gold...` :
-                `In the grand palace, where noble lords plot and scheme...`
-        }
-    };
-    
-    if (templates[theme] && templates[theme][type]) {
-        return templates[theme][type];
-    } else if (storyTemplates.act1 && storyTemplates.act1[theme] && storyTemplates.act1[theme][type]) {
-        return storyTemplates.act1[theme][type];
-    } else {
-        return `A ${type} ${theme} story unfolds...`;
-    }
-}
-
-// Helper function to generate character-appropriate actions
-function getCharacterAction(character, defaultAction) {
-    if (!character || !character.character) return defaultAction;
-    
-    const profession = character.character.profession.toLowerCase();
-    const personality = character.character.personality.toLowerCase();
-    
-    // Generate actions based on profession and personality
-    if (profession.includes('baker')) {
-        if (personality.includes('worried')) return 'kneads bread while worrying about their family';
-        if (personality.includes('hardworking')) return 'works from dawn to dusk baking for the community';
-        return 'provides fresh bread while listening to town gossip';
-    }
-    
-    if (profession.includes('merchant')) {
-        if (personality.includes('ambitious')) return 'seeks new trade opportunities despite the troubles';
-        if (personality.includes('worried')) return 'counts dwindling coins while planning their next move';
-        return 'haggles with customers while discussing town affairs';
-    }
-    
-    if (profession.includes('barkeep')) {
-        if (personality.includes('friendly')) return 'serves ale with a smile while gathering the latest news';
-        if (personality.includes('gossipy')) return 'pours drinks while sharing all the town\'s secrets';
-        return 'tends bar while listening to every conversation';
-    }
-    
-    if (profession.includes('former miner')) {
-        if (personality.includes('bitter')) return 'drinks heavily while cursing the day the mine closed';
-        if (personality.includes('melancholy')) return 'stares into the distance, remembering better times';
-        return 'speaks of the old days when the mine brought prosperity';
-    }
-    
-    if (profession.includes('mayor')) {
-        if (personality.includes('ambitious')) return 'makes grand plans for the town\'s future';
-        if (personality.includes('evasive')) return 'speaks in riddles about important matters';
-        return 'meets with visitors while keeping secrets';
-    }
-    
-    return defaultAction;
-}
-
-function selectChoice(act, theme, type) {
-    // Remove previous selection
-    document.querySelectorAll(`#${act}-choices .choice`).forEach(choice => {
-        choice.classList.remove('selected');
+        choiceDiv.innerHTML = `
+            <div class="choice-text">${char.name} - ${char.character.profession}</div>
+            <div class="choice-source">${personalityHint}</div>
+            <div style="font-size: 0.8em; color: #daa520; margin-top: 5px;">
+                Enjoys: ${preferredThemes} • Prefers: ${preferredTruthLevel} stories
+            </div>
+        `;
+        targetSection.appendChild(choiceDiv);
     });
     
-    // Add selection to clicked choice
-    event.target.closest('.choice').classList.add('selected');
+    act1Choices.appendChild(targetSection);
     
-    // Store choice
-    gameState.storyChoices[act] = { theme, type };
+    // Show selected target
+    displaySelectedTarget();
+}
+
+function selectTargetAudience(character) {
+    gameState.storyChoices.targetAudience = character;
     
-    // Generate and store story characters when Act 1 is selected
-    if (act === 'act1') {
-        // Use the pre-stored characters for this specific choice
-        const choiceKey = `${theme}-${type}`;
-        gameState.storyCharacters = gameState.act1ChoiceData[choiceKey] || getCharactersForSpecificChoice(theme, type);
-    }
+    // Generate generic story characters based on the target's preferences
+    const preferredThemes = character.character.storyPreferences?.themes || ['industrial'];
+    const primaryTheme = preferredThemes[0] || 'industrial';
     
-    // Update selected choice display
-    const selectedDiv = document.getElementById(`${act}-selected`);
-    let selectedText = '';
-    const storyCharacters = getStoryCharacters();
+    gameState.storyCharacters = generateGenericStoryCharacters(primaryTheme, character);
     
-    // Use contextual text that matches what the user just selected
-    if (act === 'act1') {
-        // Act 1 uses the original template system
-        if (storyTemplates[act] && storyTemplates[act][theme] && storyTemplates[act][theme][type]) {
-            selectedText = storyTemplates[act][theme][type];
-        } else {
-            selectedText = `${theme} story with ${type} information`;
-        }
-    } else if (act === 'act2') {
-        // Act 2 uses contextual text based on Act 1
-        selectedText = generateAct2Text(gameState.storyChoices.act1, theme, type, storyCharacters);
-    } else if (act === 'act3') {
-        // Act 3 uses contextual text based on Acts 1 and 2
-        selectedText = generateAct3Text(gameState.storyChoices.act1, gameState.storyChoices.act2, theme, type, storyCharacters);
-    } else {
-        selectedText = `${theme} story with ${type} information`;
-    }
+    // Update UI to show selection
+    displaySelectedTarget();
     
-    selectedDiv.innerHTML = `<strong>Selected:</strong> ${selectedText}`;
-    
-    // Generate next act choices
-    if (act === 'act1') {
-        generateAct2Choices();
-    } else if (act === 'act2') {
-        generateAct3Choices();
-    }
+    // Progress to Phase 2: Location Selection
+    generateLocationSelectionChoices();
     
     updateStoryPreview();
     updateTellStoryButton();
 }
 
+function selectGeneralAudience() {
+    gameState.storyChoices.targetAudience = 'general';
+    displaySelectedTarget();
+    generateLocationSelectionChoices();
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+function displaySelectedTarget() {
+    const selected = gameState.storyChoices.targetAudience;
+    const act1Choices = document.getElementById('act1-choices');
+    // Remove any existing selection display
+    const existingSelected = act1Choices.querySelector('.target-selected');
+    if (existingSelected) existingSelected.remove();
+    if (selected && selected !== 'general') {
+        const selectedDiv = document.createElement('div');
+        selectedDiv.className = 'target-selected';
+        selectedDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.2); border-radius: 8px; border-left: 4px solid #32cd32;';
+        selectedDiv.innerHTML = `
+            <h4 style="color: #32cd32; margin-bottom: 10px;">✓ Target Audience Selected</h4>
+            <div><strong>${selected.name}</strong> - ${selected.character.profession}</div>
+            <div style="color: #ccc; margin: 5px 0;">${selected.character.personalityTrait?.trait || 'Unknown personality'}</div>
+            <div style="font-size: 0.9em; color: #daa520;">
+                Your story will be crafted to inspire and resonate with ${selected.name}'s personality and preferences.
+            </div>
+            <button onclick="clearTargetAudience()" style="margin-top: 10px; padding: 5px 10px; font-size: 0.8em;">
+                Change Target
+            </button>
+        `;
+        act1Choices.appendChild(selectedDiv);
+    } else if (selected === 'general') {
+        const selectedDiv = document.createElement('div');
+        selectedDiv.className = 'target-selected';
+        selectedDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.2); border-radius: 8px; border-left: 4px solid #32cd32;';
+        selectedDiv.innerHTML = `
+            <h4 style=\"color: #32cd32; margin-bottom: 10px;\">✓ General Audience Selected</h4>
+            <div>This story will be crafted for the general crowd, not a specific person.</div>
+            <button onclick=\"clearTargetAudience()\" style=\"margin-top: 10px; padding: 5px 10px; font-size: 0.8em;\">Change Target</button>
+        `;
+        act1Choices.appendChild(selectedDiv);
+    }
+}
+
+function clearTargetAudience() {
+    gameState.storyChoices.targetAudience = null;
+    gameState.storyChoices.location = null;
+    gameState.storyChoices.event = null;
+    gameState.storyChoices.resolution = null;
+    gameState.storyCharacters = null;
+    
+    // Clear all subsequent phases
+    document.getElementById('act2-choices').innerHTML = '';
+    document.getElementById('act3-choices').innerHTML = '';
+    document.getElementById('act1-selected').innerHTML = '';
+    document.getElementById('act2-selected').innerHTML = '';
+    document.getElementById('act3-selected').innerHTML = '';
+    document.getElementById('story-preview-text').innerHTML = '';
+    
+    // Regenerate Phase 1
+    generateCharacterSelectionChoices();
+    // Regenerate Phase 2 (location selection) to prompt for a new setting
+    generateLocationSelectionChoices();
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+// Phase 2: Location Selection (NEW)
+function generateLocationSelectionChoices() {
+    const act2Choices = document.getElementById('act2-choices');
+    act2Choices.innerHTML = '<h3>Phase 2: Choose the Setting</h3><p style="color: #ccc; font-style: italic;">Select where your story takes place. Locations are filtered based on where your target audience member would logically appear.</p>';
+    
+    const targetAudience = gameState.storyChoices.targetAudience;
+    if (!targetAudience) return;
+    
+    const validLocations = getValidLocationsForCharacter(targetAudience);
+    
+    if (validLocations.length === 0) {
+        act2Choices.innerHTML += '<p style="color: #ffa500;">No suitable locations found for this character type.</p>';
+        return;
+    }
+    
+    const locationSection = document.createElement('div');
+    locationSection.innerHTML = '<h4>Available Settings:</h4>';
+    
+    validLocations.forEach(location => {
+        const choiceDiv = document.createElement('div');
+        choiceDiv.className = 'choice';
+        if (location.compatibility === 'unlikely') {
+            choiceDiv.style.opacity = '0.7';
+        }
+        choiceDiv.onclick = () => selectLocation(location);
+        
+        const compatibilityColor = {
+            'natural': '#32cd32',
+            'possible': '#daa520', 
+            'unlikely': '#ffa500'
+        }[location.compatibility];
+        
+        const compatibilityText = {
+            'natural': 'Perfect Match',
+            'possible': 'Good Fit',
+            'unlikely': 'Unusual Choice'
+        }[location.compatibility];
+        
+        // Use a generic label for general audience
+        const professionLabel = (targetAudience === 'general')
+            ? 'the crowd'
+            : targetAudience.character.profession;
+        
+        choiceDiv.innerHTML = `
+            <div class="choice-text">${location.name}</div>
+            <div class="choice-source">${location.description}</div>
+            <div style="font-size: 0.8em; color: ${compatibilityColor}; margin-top: 5px;">
+                ${compatibilityText} for ${professionLabel}
+            </div>
+        `;
+        locationSection.appendChild(choiceDiv);
+    });
+    
+    act2Choices.appendChild(locationSection);
+    
+    // Show selected location if any
+    displaySelectedLocation();
+}
+
+function selectLocation(location) {
+    gameState.storyChoices.location = location;
+    
+    // Update UI to show selection
+    displaySelectedLocation();
+    
+    // Progress to Phase 3: Event Selection
+    generateEventSelectionChoices();
+    
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+function displaySelectedLocation() {
+    const selected = gameState.storyChoices.location;
+    if (selected) {
+        const act2Choices = document.getElementById('act2-choices');
+        
+        // Remove any existing selection display
+        const existingSelected = act2Choices.querySelector('.location-selected');
+        if (existingSelected) existingSelected.remove();
+        
+        const selectedDiv = document.createElement('div');
+        selectedDiv.className = 'location-selected';
+        selectedDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.2); border-radius: 8px; border-left: 4px solid #32cd32;';
+        selectedDiv.innerHTML = `
+            <h4 style="color: #32cd32; margin-bottom: 10px;">✓ Setting Selected</h4>
+            <div><strong>${selected.name}</strong></div>
+            <div style="color: #ccc; margin: 5px 0;">${selected.description}</div>
+            <button onclick="clearLocation()" style="margin-top: 10px; padding: 5px 10px; font-size: 0.8em;">
+                Change Setting
+            </button>
+        `;
+        act2Choices.appendChild(selectedDiv);
+    }
+}
+
+function clearLocation() {
+    gameState.storyChoices.location = null;
+    gameState.storyChoices.event = null;
+    gameState.storyChoices.resolution = null;
+    
+    // Clear subsequent phases
+    document.getElementById('act3-choices').innerHTML = '';
+    document.getElementById('act2-selected').innerHTML = '';
+    document.getElementById('act3-selected').innerHTML = '';
+    document.getElementById('story-preview-text').innerHTML = '';
+    
+    // Regenerate Phase 2
+    generateLocationSelectionChoices();
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+// Phase 3: Event Selection (NEW)
+function generateEventSelectionChoices() {
+    const act3Choices = document.getElementById('act3-choices');
+    act3Choices.innerHTML = '<h3>Phase 3: Choose the Story Event</h3><p style="color: #ccc; font-style: italic;">Select what happens in your story. Events are tailored to your chosen setting and character type.</p>';
+    const targetAudience = gameState.storyChoices.targetAudience;
+    const location = gameState.storyChoices.location;
+    if (!targetAudience || !location) return;
+    // For general audience, use a generic profession to fetch events
+    let profession = (targetAudience === 'general') ? 'Storyteller' : targetAudience.character.profession;
+    const locationEvents = getEventsForLocation(location.key || location.name, profession);
+    if (locationEvents.length === 0) {
+        act3Choices.innerHTML += '<p style="color: #ffa500;">No suitable events found for this location and character combination.</p>';
+        return;
+    }
+    const eventSection = document.createElement('div');
+    eventSection.innerHTML = '<h4>Available Story Events:</h4>';
+    locationEvents.forEach(event => {
+        const choiceDiv = document.createElement('div');
+        choiceDiv.className = 'choice';
+        choiceDiv.onclick = () => selectEvent(event);
+        choiceDiv.innerHTML = `
+            <div class="choice-text">${event.title}</div>
+            <div class="choice-source">${event.description}</div>
+            <div style="font-size: 0.8em; color: #daa520; margin-top: 5px;">
+                ${event.type === 'confirmed' ? 'Based on Facts' : event.type === 'rumored' ? 'Based on Rumors' : 'Pure Fiction'}
+            </div>
+        `;
+        eventSection.appendChild(choiceDiv);
+    });
+    act3Choices.appendChild(eventSection);
+    // Show selected event if any
+    displaySelectedEvent();
+}
+
+function getEventsForLocation(locationName, profession) {
+    const locationEvents = {
+        'Mine': [
+            {
+                title: 'The Lost Vein Discovery',
+                description: 'A rich vein of ore is discovered in an abandoned section, but mysterious dangers guard it.',
+                type: 'rumored',
+                profession_fit: ['Miner', 'Engineer', 'Foreman']
+            },
+            {
+                title: 'The Cave-In Rescue',
+                description: 'When workers are trapped by falling rocks, a hero must brave danger to save them.',
+                type: 'confirmed',
+                profession_fit: ['Miner', 'Doctor', 'Guard']
+            },
+            {
+                title: 'The Underground Kingdom',
+                description: 'Deep beneath the mine, an ancient civilization still thrives in crystal caverns.',
+                type: 'madeUp',
+                profession_fit: ['Miner', 'Merchant', 'Priest']
+            }
+        ],
+        'Market': [
+            {
+                title: 'The Merchant\'s Gamble',
+                description: 'A risky trade deal could save the struggling market, but at what cost?',
+                type: 'confirmed',
+                profession_fit: ['Merchant', 'Mayor', 'Farmer']
+            },
+            {
+                title: 'The Midnight Auction',
+                description: 'Strange items appear for sale only at midnight, drawing mysterious buyers.',
+                type: 'rumored',
+                profession_fit: ['Merchant', 'Guard', 'Priest']
+            },
+            {
+                title: 'The Wishing Stall',
+                description: 'A magical vendor appears whose wares can grant the heart\'s deepest desires.',
+                type: 'madeUp',
+                profession_fit: ['Merchant', 'Farmer', 'Blacksmith']
+            }
+        ],
+        'Tavern': [
+            {
+                title: 'The Stranger\'s Tale',
+                description: 'A mysterious traveler arrives with news that changes everything.',
+                type: 'confirmed',
+                profession_fit: ['Innkeeper', 'Barmaid', 'Merchant']
+            },
+            {
+                title: 'The Cursed Drink',
+                description: 'Patrons who drink from a certain bottle begin acting strangely.',
+                type: 'rumored',
+                profession_fit: ['Innkeeper', 'Barmaid', 'Doctor']
+            },
+            {
+                title: 'The Portal in the Cellar',
+                description: 'The tavern\'s basement hides a gateway to other worlds.',
+                type: 'madeUp',
+                profession_fit: ['Innkeeper', 'Barmaid', 'Priest']
+            }
+        ],
+        'Church': [
+            {
+                title: 'The Lost Relic',
+                description: 'A sacred artifact goes missing, and the faithful must recover it.',
+                type: 'confirmed',
+                profession_fit: ['Priest', 'Mayor', 'Guard']
+            },
+            {
+                title: 'The Weeping Statue',
+                description: 'The church statue begins crying tears that heal the sick.',
+                type: 'rumored',
+                profession_fit: ['Priest', 'Doctor', 'Farmer']
+            },
+            {
+                title: 'The Angel\'s Visitation',
+                description: 'A divine messenger appears to deliver an important prophecy.',
+                type: 'madeUp',
+                profession_fit: ['Priest', 'Mayor', 'Merchant']
+            }
+        ],
+        'Town Hall': [
+            {
+                title: 'The Corruption Scandal',
+                description: 'Evidence of wrongdoing threatens to topple the local government.',
+                type: 'confirmed',
+                profession_fit: ['Mayor', 'Guard', 'Merchant']
+            },
+            {
+                title: 'The Secret Meeting',
+                description: 'Important decisions are being made behind closed doors.',
+                type: 'rumored',
+                profession_fit: ['Mayor', 'Priest', 'Doctor']
+            },
+            {
+                title: 'The Crown\'s Command',
+                description: 'A royal decree arrives that will change the town\'s fate forever.',
+                type: 'madeUp',
+                profession_fit: ['Mayor', 'Guard', 'Priest']
+            }
+        ],
+        'Farm': [
+            {
+                title: 'The Failing Harvest',
+                description: 'Crops are dying and the community faces starvation without action.',
+                type: 'confirmed',
+                profession_fit: ['Farmer', 'Doctor', 'Merchant']
+            },
+            {
+                title: 'The Midnight Visitors',
+                description: 'Strange lights and sounds disturb the livestock every night.',
+                type: 'rumored',
+                profession_fit: ['Farmer', 'Priest', 'Guard']
+            },
+            {
+                title: 'The Enchanted Seeds',
+                description: 'Magical seeds promise incredible harvests but demand a price.',
+                type: 'madeUp',
+                profession_fit: ['Farmer', 'Merchant', 'Priest']
+            }
+        ],
+        'Forest': [
+            {
+                title: 'The Lost Expedition',
+                description: 'A group of travelers vanished in the woods and must be found.',
+                type: 'confirmed',
+                profession_fit: ['Hunter', 'Ranger', 'Guard']
+            },
+            {
+                title: 'The Howling Nights',
+                description: 'Unnatural sounds echo through the trees, frightening the townspeople.',
+                type: 'rumored',
+                profession_fit: ['Hunter', 'Priest', 'Doctor']
+            },
+            {
+                title: 'The Fairy Court',
+                description: 'Ancient forest spirits hold court and judge mortal affairs.',
+                type: 'madeUp',
+                profession_fit: ['Hunter', 'Priest', 'Merchant']
+            }
+        ],
+        'Docks': [
+            {
+                title: 'The Storm-Wrecked Ship',
+                description: 'A vessel arrives damaged, carrying survivors with urgent news.',
+                type: 'confirmed',
+                profession_fit: ['Sailor', 'Fisherman', 'Doctor']
+            },
+            {
+                title: 'The Ghost Ship',
+                description: 'A phantom vessel appears in the harbor on foggy nights.',
+                type: 'rumored',
+                profession_fit: ['Sailor', 'Fisherman', 'Priest']
+            },
+            {
+                title: 'The Mermaid\'s Bargain',
+                description: 'Sea creatures offer prosperity in exchange for a heavy price.',
+                type: 'madeUp',
+                profession_fit: ['Sailor', 'Fisherman', 'Merchant']
+            }
+        ],
+        'Lighthouse': [
+            {
+                title: 'The Lighthouse Keeper\'s Secret',
+                description: 'The lighthouse keeper hides a dark past that could change the town forever.',
+                type: 'rumored',
+                profession_fit: ['Lighthouse keeper', 'Sea captain', 'Dock Worker', 'Fisherman']
+            },
+            {
+                title: 'The Lighthouse Lantern\'s Curse',
+                description: 'The lighthouse lantern is said to be cursed, causing strange occurrences.',
+                type: 'confirmed',
+                profession_fit: ['Lighthouse keeper', 'Sea captain', 'Dock Worker', 'Fisherman']
+            },
+            {
+                title: 'The Lighthouse Keeper\'s Prophecy',
+                description: 'The lighthouse keeper receives a prophecy that could save or doom the town.',
+                type: 'madeUp',
+                profession_fit: ['Lighthouse keeper', 'Sea captain', 'Dock Worker', 'Fisherman']
+            }
+        ],
+        'Graveyard': [
+            {
+                title: 'The Graveyard\'s Secrets',
+                description: 'The graveyard holds the secrets of the town\'s past and its future.',
+                type: 'rumored',
+                profession_fit: ['Priest', 'Doctor', 'Farmer', 'Hunter', 'Ranger', 'Guard']
+            },
+            {
+                title: 'The Graveyard\'s Curse',
+                description: 'The graveyard is said to be cursed, causing strange occurrences.',
+                type: 'confirmed',
+                profession_fit: ['Priest', 'Doctor', 'Farmer', 'Hunter', 'Ranger', 'Guard']
+            },
+            {
+                title: 'The Graveyard\'s Prophecy',
+                description: 'The graveyard holds a prophecy that could save or doom the town.',
+                type: 'madeUp',
+                profession_fit: ['Priest', 'Doctor', 'Farmer', 'Hunter', 'Ranger', 'Guard']
+            }
+        ],
+        'School': [
+            {
+                title: 'The School\'s Secrets',
+                description: 'The school holds the secrets of the town\'s future leaders.',
+                type: 'rumored',
+                profession_fit: ['Teacher', 'Student', 'Principal', 'Janitor', 'Counselor']
+            },
+            {
+                title: 'The School\'s Curse',
+                description: 'The school is said to be cursed, causing strange occurrences.',
+                type: 'confirmed',
+                profession_fit: ['Teacher', 'Student', 'Principal', 'Janitor', 'Counselor']
+            },
+            {
+                title: 'The School\'s Prophecy',
+                description: 'The school holds a prophecy that could save or doom the town.',
+                type: 'madeUp',
+                profession_fit: ['Teacher', 'Student', 'Principal', 'Janitor', 'Counselor']
+            }
+        ]
+    };
+    
+    const events = locationEvents[locationName] || [];
+    
+    // For general audience, show all events for the location
+    if (profession === 'Storyteller') {
+        return events;
+    }
+    // Filter events based on profession fit (case-insensitive, partial match)
+    const fittingEvents = events.filter(event => 
+        event.profession_fit.some(p => profession && profession.toLowerCase().includes(p.toLowerCase()))
+    );
+    // If no perfect fits, return all events for the location
+    return fittingEvents.length > 0 ? fittingEvents : events;
+}
+
+function selectEvent(event) {
+    gameState.storyChoices.event = event;
+    
+    // Update UI to show selection
+    displaySelectedEvent();
+    
+    // Update story preview
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+function displaySelectedEvent() {
+    const selected = gameState.storyChoices.event;
+    if (selected) {
+        const act3Choices = document.getElementById('act3-choices');
+        
+        // Remove any existing selection display
+        const existingSelected = act3Choices.querySelector('.event-selected');
+        if (existingSelected) existingSelected.remove();
+        
+        const selectedDiv = document.createElement('div');
+        selectedDiv.className = 'event-selected';
+        selectedDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(34, 139, 34, 0.2); border-radius: 8px; border-left: 4px solid #32cd32;';
+        selectedDiv.innerHTML = `
+            <h4 style="color: #32cd32; margin-bottom: 10px;">✓ Story Event Selected</h4>
+            <div><strong>${selected.title}</strong></div>
+            <div style="color: #ccc; margin: 5px 0;">${selected.description}</div>
+            <button onclick="clearEvent()" style="margin-top: 10px; padding: 5px 10px; font-size: 0.8em;">
+                Change Event
+            </button>
+        `;
+        act3Choices.appendChild(selectedDiv);
+    }
+}
+
+function clearEvent() {
+    gameState.storyChoices.event = null;
+    
+    // Clear UI
+    document.getElementById('act3-selected').innerHTML = '';
+    document.getElementById('story-preview-text').innerHTML = '';
+    
+    // Regenerate Phase 3
+    generateEventSelectionChoices();
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+// Update story generation to use the new Character → Location → Event structure
+function generateStoryFromElements() {
+    const story = gameState.storyChoices;
+    let targetAudience = story.targetAudience;
+    const location = story.location;
+    const event = story.event;
+    
+    if (!targetAudience && targetAudience !== 'general') return 'Please select a target audience member or general audience first.';
+    if (!location) return 'Please select a setting for your story.';
+    if (!event) return 'Please select a story event.';
+    
+    // If general, use default preferences
+    let preferredThemes = ['industrial'];
+    let primaryTheme = 'industrial';
+    let characters = generateGenericStoryCharacters(primaryTheme);
+    let preferredTruthLevel = 'any';
+    if (targetAudience !== 'general' && targetAudience.character) {
+        preferredThemes = targetAudience.character.storyPreferences?.themes || ['industrial'];
+        primaryTheme = preferredThemes[0] || 'industrial';
+        characters = generateGenericStoryCharacters(primaryTheme, targetAudience);
+        preferredTruthLevel = targetAudience.character.storyPreferences?.truthLevel || 'any';
+    }
+    
+    const locationCharacter = getGenericCharacterForLocation(location.name);
+    
+    const townInfo = (locations && locations.townInfo) ? locations.townInfo : { name: 'this town', type: 'mining' };
+    
+    // Act 1: Setup - Introduce the setting and character
+    let storyText = `In the ${location.name.toLowerCase()} of ${townInfo.name}, where ${getLocationAtmosphere(location.name)}, `;
+    storyText += `${locationCharacter} faced a challenge that would test their very spirit. `;
+    storyText += `${event.description} Thus began the tale that would shape their destiny.`;
+    storyText += '<br><br>';
+    
+    // Act 2: Conflict - Develop the event
+    storyText += `As ${event.title.toLowerCase()} unfolded, ${locationCharacter} found themselves at the center of the drama. `;
+    storyText += `With ${characters.supportingChar.name} offering guidance and ${characters.antagonist.name} standing as an obstacle, `;
+    storyText += `the path ahead grew treacherous. But courage would light the way through the gathering storm.`;
+    storyText += '<br><br>';
+    
+    // Act 3: Resolution - Based on event type and target audience preferences
+    if (event.type === 'confirmed' || preferredTruthLevel === 'confirmed') {
+        storyText += `Through determination and the help of their community, ${locationCharacter} found a way to overcome the challenge. `;
+        storyText += `The ${location.name.toLowerCase()} was changed for the better, and the lesson learned was that even the greatest obstacles can be conquered with persistence and hope.`;
+    } else if (event.type === 'rumored' || preferredTruthLevel === 'rumored') {
+        storyText += `The truth of what happened may never be fully known, but ${locationCharacter}'s bravery in the face of mystery became legend. `;
+        storyText += `Some say the ${location.name.toLowerCase()} still holds secrets, but those who were there know that courage can illuminate even the darkest unknowns.`;
+    } else {
+        storyText += `In a twist of magic and wonder, ${locationCharacter} discovered that the impossible was merely waiting for someone brave enough to believe. `;
+        storyText += `The ${location.name.toLowerCase()} became a place of enchantment, proving that the greatest adventures begin when we dare to dream beyond the ordinary.`;
+    }
+    
+    return storyText;
+}
+
+function getGenericCharacterForLocation(locationName) {
+    const locationCharacters = {
+        'Mine': 'a determined miner',
+        'Market': 'a clever merchant',
+        'Tavern': 'a wise innkeeper',
+        'Church': 'a faithful priest',
+        'Town Hall': 'a dedicated mayor',
+        'Farm': 'a hardworking farmer',
+        'Forest': 'a brave hunter',
+        'Docks': 'a seasoned sailor',
+        'Lighthouse': 'a lighthouse keeper',
+        'Graveyard': 'a mournful caretaker',
+        'School': 'a dedicated teacher'
+    };
+    
+    return locationCharacters[locationName] || 'a brave soul';
+}
+
+function getLocationAtmosphere(locationName) {
+    const atmospheres = {
+        'Mine': 'the echoes of pickaxes and the weight of stone press down',
+        'Market': 'the bustle of commerce and the scent of fresh goods fill the air',
+        'Tavern': 'warm hearth-light dances and stories flow like ale',
+        'Church': 'sacred silence holds the prayers of generations',
+        'Town Hall': 'the weight of civic duty and community decisions linger',
+        'Farm': 'the rhythm of seasons and the promise of harvest endure',
+        'Forest': 'ancient trees whisper secrets and shadows dance',
+        'Docks': 'salt spray mingles with the creak of ships and distant horizons call',
+        'Lighthouse': 'the lighthouse keeper\'s lantern guides ships through the night',
+        'Graveyard': 'the quiet solemnity of the dead surrounds you',
+        'School': 'the sound of learning and laughter fills the air'
+    };
+    
+    return atmospheres[locationName] || 'the spirit of the place holds sway';
+}
+
+// Phase 4: Resolution Selection
+function generateResolutionSelectionChoices() {
+    const act3Choices = document.getElementById('act3-choices');
+    act3Choices.innerHTML = '<h3>Phase 4: Choose the Resolution</h3>';
+    
+    const resolutions = [
+        { text: 'Triumph - The hero succeeds against all odds', type: 'triumph' },
+        { text: 'Tragedy - The hero fails, but learns a valuable lesson', type: 'tragedy' },
+        { text: 'Change - The hero transforms the situation for the better', type: 'change' },
+        { text: 'Sacrifice - The hero gives up something important to succeed', type: 'sacrifice' },
+        { text: 'Redemption - The antagonist finds a path to goodness', type: 'redemption' },
+        { text: 'Reconciliation - Former enemies become allies', type: 'reconciliation' }
+    ];
+    
+    resolutions.forEach(resolution => {
+        const choiceDiv = document.createElement('div');
+        choiceDiv.className = 'choice';
+        choiceDiv.onclick = () => selectResolution(resolution);
+        choiceDiv.innerHTML = `
+            <div class="choice-text">${resolution.text}</div>
+            <div class="choice-source">A classic story ending</div>
+        `;
+        act3Choices.appendChild(choiceDiv);
+    });
+}
+
 function generateAct2Choices() {
-    const choices = document.getElementById('act2-choices');
-    choices.innerHTML = '';
+    const act2Choices = document.getElementById('act2-choices');
+    act2Choices.innerHTML = '';
     
     // Get the Act 1 context and characters
     const act1Choice = gameState.storyChoices.act1;
@@ -1873,7 +5298,7 @@ function generateAct2Choices() {
                 <div class="choice-source">Style: ${type === 'madeUp' ? 'Fantasy' : (type === 'confirmed' ? 'Realistic' : 'Mysterious')}</div>
             `;
             
-            choices.appendChild(choice);
+            act2Choices.appendChild(choice);
         });
     });
 }
@@ -1912,7 +5337,7 @@ function generateAct2Text(act1Choice, act2Theme, type, characters) {
                 madeUp: `Blessed with mystical merchant powers, ${protName} sets forth to discover legendary trading routes of old...`
             },
             discovery: {
-                confirmed: `Through careful business investigation, ${protName} and ${supportName} work to uncover what's really affecting trade...`,
+                confirmed: `Through careful business investigation, ${protName} and ${supportName} work to understand what's really affecting trade...`,
                 rumored: `Following cryptic market rumors and coded messages, ${protName} discovers something that could transform commerce...`,
                 madeUp: `With supernatural business insight, ${protName} reveals ancient secrets of prosperity hidden in the stars...`
             },
@@ -1972,8 +5397,8 @@ function generateAct2Text(act1Choice, act2Theme, type, characters) {
 }
 
 function generateAct3Choices() {
-    const choices = document.getElementById('act3-choices');
-    choices.innerHTML = '';
+    const act3Choices = document.getElementById('act3-choices');
+    act3Choices.innerHTML = '';
     
     // Get the Act 1 and Act 2 context and characters
     const act1Choice = gameState.storyChoices.act1;
@@ -2001,7 +5426,7 @@ function generateAct3Choices() {
                 <div class="choice-source">${themeDisplay} (${typeDisplay})</div>
             `;
             
-            choices.appendChild(choice);
+            act3Choices.appendChild(choice);
         });
     });
 }
@@ -2043,6 +5468,41 @@ function getSpecificSolution(act2Theme, act1Theme) {
            solutions[act2Theme][act1Theme] : 'determined action';
 }
 
+// Helper function to ensure Act III stories have definitive endings
+function ensureDefinitiveEnding(template, act3Theme, type) {
+    // If template doesn't end with "...", return as-is
+    if (!template.endsWith('...')) {
+        return template;
+    }
+    
+    // Remove the "..." and add appropriate definitive endings
+    const baseText = template.slice(0, -3);
+    
+    const endings = {
+        triumph: {
+            confirmed: " The victory was complete and lasting, bringing peace and prosperity for generations to come.",
+            rumored: " Though mysteries remained, the positive outcome spoke for itself, and the community prospered in ways both visible and hidden.",
+            madeUp: " The magical triumph became the stuff of legends, inspiring heroes and dreamers across the realm for centuries."
+        },
+        tragedy: {
+            confirmed: " The failure was final and heartbreaking, leaving scars that would never fully heal but teaching valuable lessons to those who survived.",
+            rumored: " The tragic end remained shrouded in mystery, but its impact was undeniable, forever changing how people understood the fragility of hope.",
+            madeUp: " The magical catastrophe sealed the fate of all involved, creating a cautionary tale that would be whispered in hushed tones for ages to come."
+        },
+        change: {
+            confirmed: " The transformation was gradual but irreversible, creating a new reality that everyone had to learn to navigate with courage and wisdom.",
+            rumored: " The mysterious changes continued to unfold in unexpected ways, leaving the future uncertain but filled with new possibilities.",
+            madeUp: " The magical transformation rewrote the very fabric of reality, creating a world where anything seemed possible but nothing was ever quite the same."
+        }
+    };
+    
+    const ending = endings[act3Theme] && endings[act3Theme][type] ? 
+                  endings[act3Theme][type] : 
+                  " The story reached its inevitable conclusion, leaving all involved forever changed by the experience.";
+    
+    return baseText + ending;
+}
+
 function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
     const { protagonist, supportingChar, antagonist, townInfo } = characters;
     const protName = protagonist ? protagonist.name : 'a brave soul';
@@ -2056,19 +5516,19 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
         // Various story progression paths - Enhanced for better cohesion
         'industrial-adventure': {
             triumph: {
-                confirmed: `${protName}'s bold venture beyond ${townInfo.name} pays off - they return with new trade partners, skilled workers, and fresh hope. The ${getSpecificProblem(act1Choice.theme)} that once seemed insurmountable now has real solutions, and ${supportName} helps organize the community's renewal...`,
-                rumored: `${protName} returns from their mysterious journey changed, bringing whispered tales of distant places and hidden opportunities. While ${supportName} can't quite understand what ${protName} discovered, the industrial heart of ${townInfo.name} slowly stirs back to life in unexpected ways...`,
-                madeUp: `${protName} emerges from their mystical quest wielding powers that restore the ${act1Choice.theme} sites to their former glory and beyond. With ${supportName} as their trusted ally, they reshape ${townInfo.name} into a wonderland where magic and industry work as one...`
+                confirmed: `${protName}'s bold venture beyond ${townInfo.name} pays off completely. They return with new trade partners, skilled workers, and fresh hope. The ${getSpecificProblem(act1Choice.theme)} that once seemed insurmountable now has real solutions, and ${supportName} helps organize the community's renewal. Within a year, ${townInfo.name} becomes more prosperous than it had been in decades, and ${protName} is remembered as the one who saved them all.`,
+                rumored: `${protName} returns from their mysterious journey changed, bringing whispered tales of distant places and hidden opportunities. While ${supportName} can't quite understand what ${protName} discovered, the industrial heart of ${townInfo.name} slowly stirs back to life in unexpected ways. The townspeople ask few questions, content with their returned prosperity and grateful to ${protName} for reasons they may never fully comprehend.`,
+                madeUp: `${protName} emerges from their mystical quest wielding powers that restore the ${act1Choice.theme} sites to their former glory and beyond. With ${supportName} as their trusted ally, they reshape ${townInfo.name} into a wonderland where magic and industry work as one. Travelers come from distant lands to witness the impossible made manifest, and ${protName} becomes a legend told across the realm.`
             },
             tragedy: {
-                confirmed: `${protName} returns from their dangerous venture wounded and empty-handed. The ${getSpecificProblem(act1Choice.theme)} has only worsened in their absence, and even ${supportName}'s unwavering support cannot lift the weight of ${protName}'s failure. ${townInfo.name} must face its decline without false hope...`,
-                rumored: `${protName} vanishes during their mysterious journey, leaving only cryptic messages and strange signs. ${supportName} searches desperately for answers, but the truth of what befell ${protName} - and whether their quest could have saved ${townInfo.name} - remains forever unknown...`,
-                madeUp: `${protName}'s mystical powers prove to be a curse in disguise. In trying to restore the ${act1Choice.theme} sites, they accidentally awaken the very forces that destroyed them originally. ${antName} seizes control of these dark powers, and ${protName}'s noble intentions doom ${townInfo.name} to an even darker fate...`
+                confirmed: `${protName} returns from their dangerous venture wounded and empty-handed. The ${getSpecificProblem(act1Choice.theme)} has only worsened in their absence, and even ${supportName}'s unwavering support cannot lift the weight of ${protName}'s failure. ${townInfo.name} faces its decline with grim acceptance, while ${protName} lives with the knowledge that their best efforts simply weren't enough. Yet ${supportName} ensures their courage is not forgotten by those who remain.`,
+                rumored: `${protName} vanishes during their mysterious journey, leaving only cryptic messages and strange signs. ${supportName} searches desperately for answers, but finds only silence. Eventually, ${townInfo.name} erects a memorial to their lost hero, not knowing if ${protName} died trying to save them or simply vanished into legend. The mystery haunts ${supportName} for the rest of their days.`,
+                madeUp: `${protName}'s mystical powers prove to be a curse in disguise. In trying to restore the ${act1Choice.theme} sites, they accidentally awaken the very forces that destroyed them originally. ${antName} seizes control of these dark powers, and despite ${protName}'s sacrifice to contain the evil, ${townInfo.name} is lost forever. Only ${supportName} escapes to warn others of the price of meddling with forces beyond mortal comprehension.`
             },
             change: {
-                confirmed: `${protName} returns from their journey with partial solutions - not the miracle ${townInfo.name} hoped for, but real progress nonetheless. The ${getSpecificProblem(act1Choice.theme)} begins to heal slowly, and ${supportName} helps the community adapt to their changing circumstances with newfound resilience...`,
-                rumored: `${protName}'s mysterious adventure brings subtle but profound changes to ${townInfo.name}. The industrial sites remain damaged, but people whisper of strange new opportunities that ${protName} somehow set in motion. ${supportName} watches these changes with both hope and uncertainty...`,
-                madeUp: `${protName}'s magical journey transforms not the ${act1Choice.theme} sites themselves, but the very nature of how ${townInfo.name} relates to industry and progress. With ${supportName}'s guidance, the community discovers that their future lies not in restoring the past, but in embracing entirely new possibilities...`
+                confirmed: `${protName} returns from their journey with partial solutions - not the miracle ${townInfo.name} hoped for, but real progress nonetheless. The ${getSpecificProblem(act1Choice.theme)} begins to heal slowly, and ${supportName} helps the community adapt to their changing circumstances with newfound resilience. ${townInfo.name} becomes a different place than it was before, neither fully restored nor completely broken, but stronger in ways its people are only beginning to understand.`,
+                rumored: `${protName}'s mysterious adventure brings subtle but profound changes to ${townInfo.name}. The industrial sites remain damaged, but people whisper of strange new opportunities that ${protName} somehow set in motion. ${supportName} watches these changes with both hope and uncertainty, knowing that the town has been forever altered by forces they can barely comprehend. What ${townInfo.name} will become remains a mystery, but it will never again be what it once was.`,
+                madeUp: `${protName}'s mystical journey transforms not the ${act1Choice.theme} sites themselves, but the very nature of how ${townInfo.name} relates to industry and progress. With ${supportName}'s guidance, the community discovers that their future lies not in restoring the past, but in embracing entirely new possibilities. ${townInfo.name} becomes a place where the impossible seems routine, and visitors never quite know what wonders they might encounter around the next corner.`
             }
         },
         'industrial-discovery': {
@@ -2097,7 +5557,7 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
             tragedy: {
                 confirmed: `${protName}'s brave confrontation with ${antName} over the ${getSpecificProblem(act1Choice.theme)} ends in crushing defeat. Despite ${supportName}'s desperate assistance, ${antName}'s control proves too entrenched. ${townInfo.name} learns that some evils are too powerful to overcome through courage alone...`,
                 rumored: `The conflict between ${protName} and ${antName} reaches a mysterious climax that leaves both changed. ${supportName} can only watch as ${protName} pays a terrible price for their defiance. Whether ${protName} won or lost becomes unclear, but ${townInfo.name} remains trapped by the ${getSpecificProblem(act1Choice.theme)}...`,
-                madeUp: `${protName}'s mystical powers prove insufficient against the ancient evil that ${antName} channels through the ${getSpecificProblem(act1Choice.theme)}. In their final moments, ${protName} saves ${supportName} but dooms themselves. ${townInfo.name} falls to darkness, but legends of ${protName}'s sacrifice echo through eternity...`
+                madeUp: `${protName}'s magical powers prove insufficient against the ancient evil that ${antName} channels through the ${getSpecificProblem(act1Choice.theme)}. In their final moments, ${protName} saves ${supportName} but dooms themselves. ${townInfo.name} falls to darkness, but legends of ${protName}'s sacrifice echo through eternity...`
             },
             change: {
                 confirmed: `${protName}'s confrontation with ${antName} changes both adversaries forever. Neither truly wins, but their conflict forces ${townInfo.name} to confront the reality of the ${getSpecificProblem(act1Choice.theme)}. With ${supportName}'s guidance, the community learns to navigate a new world where old certainties no longer apply...`,
@@ -2127,7 +5587,8 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
     
     // Try to get specific contextual template
     if (contextualTemplates[storyProgression] && contextualTemplates[storyProgression][act3Theme] && contextualTemplates[storyProgression][act3Theme][type]) {
-        return contextualTemplates[storyProgression][act3Theme][type];
+        const template = contextualTemplates[storyProgression][act3Theme][type];
+        return ensureDefinitiveEnding(template, act3Theme, type);
     }
     
     // Fallback: Create enhanced generic contextual ending that references previous acts
@@ -2174,47 +5635,63 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
     };
     
     if (genericContextual[act3Theme] && genericContextual[act3Theme][type]) {
-        return genericContextual[act3Theme][type];
+        return ensureDefinitiveEnding(genericContextual[act3Theme][type], act3Theme, type);
     }
     
     // Final fallback to original template
-    return storyTemplates.act3[act3Theme][type].replace(/\[PROTAGONIST\]/g, protName)
+    const fallbackTemplate = storyTemplates.act3[act3Theme][type]
+        .replace(/\[PROTAGONIST\]/g, protName)
         .replace(/\[SUPPORTING_CHAR\]/g, supportName)
         .replace(/\[ANTAGONIST\]/g, antName)
         .replace(/\[TOWN_NAME\]/g, townInfo.name);
+    
+    return ensureDefinitiveEnding(fallbackTemplate, act3Theme, type);
 }
 
 function updateStoryPreview() {
     const preview = document.getElementById('story-preview-text');
-    let storyText = '';
+    if (!preview) return;
     
-    // Get story characters - use the same system as Act 1 generation
-    const storyCharacters = getStoryCharacters();
+    const story = gameState.storyChoices;
+    if (!story.characters || !story.characters.protagonist) {
+        preview.innerHTML = '<p style="color: #999; font-style: italic;">Select your story elements to see a preview...</p>';
+        return;
+    }
     
-    if (gameState.storyChoices.act1) {
-        const { theme, type } = gameState.storyChoices.act1;
-        if (storyTemplates.act1 && storyTemplates.act1[theme] && storyTemplates.act1[theme][type]) {
-            storyText += storyTemplates.act1[theme][type] + '<br><br>';
-        } else {
-            storyText += `Act 1: ${theme} story with ${type} information<br><br>`;
+    let previewText = '';
+    
+    // Character preview
+    if (story.characters) {
+        const protag = story.characters.protagonist;
+        const antag = story.characters.antagonist;
+        const supporting = story.characters.supporting || [];
+        
+        previewText += `<strong>Cast:</strong> ${protag.name} (${protag.character.profession})`;
+        if (antag) {
+            previewText += ` vs ${antag.name} (${antag.character.profession})`;
         }
+        if (supporting.length > 0) {
+            previewText += ` with ${supporting.map(char => char.name).join(', ')}`;
+        }
+        previewText += '<br><br>';
     }
     
-    if (gameState.storyChoices.act2) {
-        const { theme, type } = gameState.storyChoices.act2;
-        // Use contextual Act 2 text that references Act 1
-        const act2Text = generateAct2Text(gameState.storyChoices.act1, theme, type, storyCharacters);
-        storyText += act2Text + '<br><br>';
+    // Location preview
+    if (story.location) {
+        previewText += `<strong>Setting:</strong> ${story.location.name}<br><br>`;
     }
     
-    if (gameState.storyChoices.act3) {
-        const { theme, type } = gameState.storyChoices.act3;
-        // Use contextual Act 3 text that references both previous acts
-        const act3Text = generateAct3Text(gameState.storyChoices.act1, gameState.storyChoices.act2, theme, type, storyCharacters);
-        storyText += act3Text;
+    // Event preview
+    if (story.event) {
+        previewText += `<strong>Event:</strong> ${story.event.text}<br><br>`;
     }
     
-    preview.innerHTML = storyText || 'Select your story choices to see the preview...';
+    // Resolution preview
+    if (story.resolution) {
+        previewText += `<strong>Resolution:</strong> ${story.resolution.text}`;
+    }
+    
+    preview.innerHTML = previewText || 'Select your story elements to see the preview...';
 }
 
 function getStoryCharacters() {
@@ -2280,9 +5757,13 @@ function getCharactersForSpecificChoice(theme, type) {
         // Filter by characteristics if specified
         if (characteristics.length > 0 && candidates.length > 1) {
             const filtered = candidates.filter(char => 
-                characteristics.some(trait => 
-                    char.character.personality.toLowerCase().includes(trait.toLowerCase())
-                )
+                characteristics.some(trait => {
+                    // Check both old personality system and new personalityTrait system
+                    const personalityText = char.character.personalityTrait ? 
+                        char.character.personalityTrait.trait : 
+                        (char.character.personality || '');
+                    return personalityText.toLowerCase().includes(trait.toLowerCase());
+                })
             );
             if (filtered.length > 0) candidates = filtered;
         }
@@ -2381,11 +5862,48 @@ function fillStoryPlaceholders(text, characters) {
 
 function updateTellStoryButton() {
     const button = document.getElementById('tell-story-btn');
-    const allSelected = gameState.storyChoices.act1 && gameState.storyChoices.act2 && gameState.storyChoices.act3;
+    if (!button) return;
+    
+    // Check if all required story elements are selected for new 3-phase structure
+    const hasTargetAudience = gameState.storyChoices.targetAudience || gameState.storyChoices.targetAudience === 'general';
+    const hasLocation = gameState.storyChoices.location;
+    const hasEvent = gameState.storyChoices.event;
+    
+    const allSelected = hasTargetAudience && hasLocation && hasEvent;
+    
     button.disabled = !allSelected;
+    
+    // Update button text to show what's missing
+    if (!allSelected) {
+        let missingText = '🎤 Tell Your Story';
+        if (!hasTargetAudience) missingText += ' (Need Target Audience)';
+        else if (!hasLocation) missingText += ' (Need Setting)';
+        else if (!hasEvent) missingText += ' (Need Story Event)';
+        button.textContent = missingText;
+    } else {
+        button.textContent = '🎤 Tell Your Story';
+    }
 }
 
 function tellStory() {
+    if (!gameState.storyChoices.targetAudience && gameState.storyChoices.targetAudience !== 'general') {
+        alert('Please select a target audience member or general audience for your story.');
+        return;
+    }
+    
+    if (!gameState.storyChoices.location) {
+        alert('Please select a setting for your story.');
+        return;
+    }
+    
+    if (!gameState.storyChoices.event) {
+        alert('Please select a story event.');
+        return;
+    }
+    
+    // Create event seeds from this story for future events
+    seedEventsFromStory(gameState.storyChoices);
+    
     document.getElementById('evening-phase').classList.add('hidden');
     document.getElementById('night-phase').classList.remove('hidden');
     gameState.currentPhase = 'night';
@@ -2397,6 +5915,20 @@ function generatePerformanceResults() {
     const audienceDiv = document.getElementById('audience-feedback');
     const earningsDiv = document.getElementById('earnings-breakdown');
     const consequencesDiv = document.getElementById('immediate-consequences');
+    
+    // Generate the actual story text based on selected elements
+    const storyText = generateStoryFromElements();
+    
+    // Display the story
+    const storyDisplay = document.getElementById('story-display');
+    if (storyDisplay) {
+        storyDisplay.innerHTML = `
+            <div style="background: rgba(255, 215, 0, 0.1); border: 2px solid #daa520; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #daa520; margin-bottom: 15px;">The Story You Told:</h3>
+                <div style="line-height: 1.6; font-size: 16px;">${storyText}</div>
+            </div>
+        `;
+    }
     
     // Calculate story effectiveness
     const storyEffectiveness = calculateStoryEffectiveness();
@@ -2447,21 +5979,89 @@ function generatePerformanceResults() {
     updateUI();
 }
 
+function generateStoryFromElements() {
+    const story = gameState.storyChoices;
+    let targetAudience = story.targetAudience;
+    const location = story.location;
+    const event = story.event;
+    if (!targetAudience && targetAudience !== 'general') return 'Please select a target audience member or general audience first.';
+    if (!location) return 'Please select a setting for your story.';
+    if (!event) return 'Please select a story event.';
+    // If general, use default preferences
+    let preferredThemes = ['industrial'];
+    let primaryTheme = 'industrial';
+    let characters = generateGenericStoryCharacters(primaryTheme);
+    let preferredTruthLevel = 'any';
+    if (targetAudience !== 'general' && targetAudience.character) {
+        preferredThemes = targetAudience.character.storyPreferences?.themes || ['industrial'];
+        primaryTheme = preferredThemes[0] || 'industrial';
+        characters = generateGenericStoryCharacters(primaryTheme, targetAudience);
+        preferredTruthLevel = targetAudience.character.storyPreferences?.truthLevel || 'any';
+    }
+    const locationCharacter = getGenericCharacterForLocation(location.name);
+    const townInfo = (locations && locations.townInfo) ? locations.townInfo : { name: 'this town', type: 'mining' };
+    let storyText = `In the ${location.name.toLowerCase()} of ${townInfo.name}, where ${getLocationAtmosphere(location.name)}, `;
+    storyText += `${locationCharacter} faced a challenge that would test their very spirit. `;
+    storyText += `${event.description} Thus began the tale that would shape their destiny.`;
+    storyText += '<br><br>';
+    storyText += `As ${event.title.toLowerCase()} unfolded, ${locationCharacter} found themselves at the center of the drama. `;
+    storyText += `With ${characters.supportingChar.name} offering guidance and ${characters.antagonist.name} standing as an obstacle, `;
+    storyText += `the path ahead grew treacherous. But courage would light the way through the gathering storm.`;
+    storyText += '<br><br>';
+    if (event.type === 'confirmed' || preferredTruthLevel === 'confirmed') {
+        storyText += `Through determination and the help of their community, ${locationCharacter} found a way to overcome the challenge. `;
+        storyText += `The ${location.name.toLowerCase()} was changed for the better, and the lesson learned was that even the greatest obstacles can be conquered with persistence and hope.`;
+    } else if (event.type === 'rumored' || preferredTruthLevel === 'rumored') {
+        storyText += `The truth of what happened may never be fully known, but ${locationCharacter}'s bravery in the face of mystery became legend. `;
+        storyText += `Some say the ${location.name.toLowerCase()} still holds secrets, but those who were there know that courage can illuminate even the darkest unknowns.`;
+    } else {
+        storyText += `In a twist of magic and wonder, ${locationCharacter} discovered that the impossible was merely waiting for someone brave enough to believe. `;
+        storyText += `The ${location.name.toLowerCase()} became a place of enchantment, proving that the greatest adventures begin when we dare to dream beyond the ordinary.`;
+    }
+    return storyText;
+}
+
 function calculateStoryEffectiveness() {
     let effectiveness = 0;
     
     // Base effectiveness from story coherence
     effectiveness += 50;
     
-    // Bonus for using gathered information
-    if (gameState.storyChoices.act1.type === 'confirmed') effectiveness += 20;
-    if (gameState.storyChoices.act1.type === 'rumored') effectiveness += 10;
-    if (gameState.storyChoices.act1.type === 'madeUp') effectiveness += 5;
+    // Bonus for using gathered information vs made-up content
+    if (gameState.storyChoices.event && gameState.storyChoices.event.type === 'confirmed') effectiveness += 20;
+    if (gameState.storyChoices.event && gameState.storyChoices.event.type === 'rumored') effectiveness += 10;
+    if (gameState.storyChoices.event && gameState.storyChoices.event.type === 'madeUp') effectiveness += 5;
     
-    // Bonus for story consistency
-    const types = [gameState.storyChoices.act1.type, gameState.storyChoices.act2.type, gameState.storyChoices.act3.type];
-    const consistentTypes = types.filter(type => type === types[0]).length;
-    effectiveness += consistentTypes * 5;
+    // Bonus for character complexity
+    const characters = gameState.storyChoices.characters;
+    if (characters) {
+        if (characters.protagonist) effectiveness += 10;
+        if (characters.antagonist) effectiveness += 10;
+        if (characters.supporting && characters.supporting.length > 0) {
+            effectiveness += characters.supporting.length * 5;
+        }
+    }
+    
+    // Bonus for location familiarity
+    if (gameState.storyChoices.location) {
+        const locationKey = gameState.storyChoices.location.key || gameState.storyChoices.location.name;
+        if (locations[locationKey] && locations[locationKey].npcs && locations[locationKey].npcs.length > 0) {
+            effectiveness += 10; // Known location with NPCs
+        } else {
+            effectiveness += 5; // Generic location
+        }
+    }
+    
+    // Bonus for resolution type
+    if (gameState.storyChoices.resolution) {
+        const resolutionType = gameState.storyChoices.resolution.type;
+        if (resolutionType === 'triumph') effectiveness += 15;
+        else if (resolutionType === 'tragedy') effectiveness += 10;
+        else if (resolutionType === 'change') effectiveness += 12;
+        else if (resolutionType === 'redemption') effectiveness += 8;
+        else if (resolutionType === 'reconciliation') effectiveness += 6;
+        else effectiveness += 5;
+    }
     
     // Calculate audience satisfaction bonus
     if (gameState.eveningAudience && gameState.eveningAudience.length > 0) {
@@ -2488,40 +6088,42 @@ function calculateAudienceSatisfaction() {
         let memberSatisfaction = 50; // Base satisfaction
         let reaction = { name: audienceMember.name, score: 0, reasons: [] };
         
-        // Truth level preference - enhanced with stronger negative reactions
-        if (preferences.truthLevel === story.act1.type) {
+        // Event type preference (replaces old act1.type)
+        const eventType = story.event ? story.event.type : 'madeUp';
+        if (preferences.truthLevel === eventType) {
             memberSatisfaction += 15;
-            reaction.reasons.push(`loved the ${story.act1.type} nature of the story`);
+            reaction.reasons.push(`loved the ${eventType} nature of the story`);
         } else if (
-            (preferences.truthLevel === 'confirmed' && story.act1.type === 'rumored') ||
-            (preferences.truthLevel === 'rumored' && story.act1.type === 'confirmed')
+            (preferences.truthLevel === 'confirmed' && eventType === 'rumored') ||
+            (preferences.truthLevel === 'rumored' && eventType === 'confirmed')
         ) {
             memberSatisfaction += 5; // Close enough
             reaction.reasons.push('appreciated the story\'s believability');
         } else {
             // Major mismatches cause strong negative reactions
-            if (preferences.truthLevel === 'confirmed' && story.act1.type === 'madeUp') {
+            if (preferences.truthLevel === 'confirmed' && eventType === 'madeUp') {
                 memberSatisfaction -= 25; // Truth-lovers hate fabricated stories
                 reaction.reasons.push('was offended by the lies and fabrications');
-            } else if (preferences.truthLevel === 'madeUp' && story.act1.type === 'confirmed') {
+            } else if (preferences.truthLevel === 'madeUp' && eventType === 'confirmed') {
                 memberSatisfaction -= 20; // Fantasy-lovers find truth boring
                 reaction.reasons.push('found the realistic story dull and uninspiring');
-            } else if (preferences.truthLevel === 'rumored' && story.act1.type === 'madeUp') {
+            } else if (preferences.truthLevel === 'rumored' && eventType === 'madeUp') {
                 memberSatisfaction -= 15; // Mystery-lovers dislike obvious fantasy
                 reaction.reasons.push('preferred mysterious ambiguity over obvious fantasy');
-            } else if (preferences.truthLevel === 'madeUp' && story.act1.type === 'rumored') {
+            } else if (preferences.truthLevel === 'madeUp' && eventType === 'rumored') {
                 memberSatisfaction -= 15; // Fantasy-lovers want clear magic, not vague rumors
                 reaction.reasons.push('wanted clear fantasy rather than vague mysteries');
             } else {
                 memberSatisfaction -= 10;
-                reaction.reasons.push(`preferred ${preferences.truthLevel} stories over ${story.act1.type} ones`);
+                reaction.reasons.push(`preferred ${preferences.truthLevel} stories over ${eventType} ones`);
             }
         }
         
-        // Theme preference - enhanced with negative reactions for disliked themes
-        if (preferences.themes.includes(story.act1.theme)) {
+        // Location theme preference (replaces old act1.theme)
+        const locationTheme = story.location ? getLocationTheme(story.location) : 'tavern';
+        if (preferences.themes.includes(locationTheme)) {
             memberSatisfaction += 10;
-            reaction.reasons.push(`was engaged by stories about ${story.act1.theme}`);
+            reaction.reasons.push(`was engaged by stories about ${locationTheme}`);
         } else {
             // Some patrons have strong dislikes for certain themes
             const strongDislikes = {
@@ -2531,14 +6133,15 @@ function calculateAudienceSatisfaction() {
                 'industrial': ['government'] // Workers distrust government stories
             };
             
-            if (strongDislikes[story.act1.theme] && preferences.themes.some(theme => strongDislikes[story.act1.theme].includes(theme))) {
+            if (strongDislikes[locationTheme] && preferences.themes.some(theme => strongDislikes[locationTheme].includes(theme))) {
                 memberSatisfaction -= 8; // Moderate negative reaction for disliked themes
-                reaction.reasons.push(`disliked the focus on ${story.act1.theme} matters`);
+                reaction.reasons.push(`disliked the focus on ${locationTheme} matters`);
             }
         }
         
-        // Tone preference check (Act 2 and 3 determine overall tone)
-        const storyTone = determineStoryTone(story);
+        // Resolution type preference (replaces old tone system)
+        const resolutionType = story.resolution ? story.resolution.type : 'triumph';
+        const storyTone = getToneFromResolution(resolutionType);
         if (preferences.tone === storyTone) {
             memberSatisfaction += 8;
             reaction.reasons.push(`loved the ${storyTone} tone of your tale`);
@@ -2573,6 +6176,85 @@ function calculateAudienceSatisfaction() {
             reaction.reasons.push(`was predisposed to enjoy your performance`);
         }
         
+        // Character relationship reactions - how they feel about characters in the story
+        const storyCharacters = getStoryCharacters();
+        if (storyCharacters && storyCharacters.length > 0) {
+            storyCharacters.forEach(storyChar => {
+                const audienceChar = audienceMember.character;
+                
+                // Check if audience member knows the story character
+                if (audienceChar.relationships) {
+                    const relationship = audienceChar.relationships.find(rel => 
+                        rel.targetName === storyChar.name || rel.targetName === storyChar.character.name
+                    );
+                    
+                    if (relationship) {
+                        // Character has a relationship with someone in the story
+                        if (relationship.relationshipType === 'spouse' || relationship.relationshipType === 'romantic_partner') {
+                            memberSatisfaction += 15;
+                            reaction.reasons.push(`was deeply moved by the story about their ${relationship.relationshipType}`);
+                        } else if (relationship.relationshipType === 'enemy' || relationship.relationshipType === 'rival') {
+                            memberSatisfaction -= 10;
+                            reaction.reasons.push(`was uncomfortable hearing about their ${relationship.relationshipType}`);
+                        } else if (relationship.relationshipType === 'friend' || relationship.relationshipType === 'business_partner') {
+                            memberSatisfaction += 8;
+                            reaction.reasons.push(`enjoyed hearing about their ${relationship.relationshipType}`);
+                        } else if (relationship.relationshipType === 'family_member') {
+                            memberSatisfaction += 12;
+                            reaction.reasons.push(`was touched by the story about their ${relationship.relationshipType}`);
+                        }
+                        
+                        // Consider relationship quality
+                        if (relationship.quality === 'excellent') {
+                            memberSatisfaction += 5;
+                        } else if (relationship.quality === 'poor') {
+                            memberSatisfaction -= 5;
+                        }
+                    }
+                }
+                
+                // Check if audience member has secrets about the story character
+                if (audienceChar.secrets && audienceChar.secrets.length > 0) {
+                    const relevantSecret = audienceChar.secrets.find(secret => 
+                        secret.text.toLowerCase().includes(storyChar.name.toLowerCase()) ||
+                        secret.text.toLowerCase().includes(storyChar.character.name.toLowerCase())
+                    );
+                    
+                    if (relevantSecret) {
+                        // They know something about the character that might not be public
+                        if (story.act1.type === 'confirmed' && relevantSecret.type === 'scandal') {
+                            memberSatisfaction -= 8;
+                            reaction.reasons.push(`was concerned about revealing sensitive information`);
+                        } else if (story.act1.type === 'rumored' && relevantSecret.type === 'scandal') {
+                            memberSatisfaction += 5;
+                            reaction.reasons.push(`appreciated the tactful way you handled the story`);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Personality-based reactions to story content
+        if (audienceMember.character.personalityTrait) {
+            const personality = audienceMember.character.personalityTrait.trait;
+            const locationTheme = story.location ? getLocationTheme(story.location) : 'tavern';
+            
+            // Different personalities react differently to story themes
+            if (locationTheme === 'government' && personality === 'Ambitious Climber') {
+                memberSatisfaction += 8;
+                reaction.reasons.push(`was particularly engaged by the political themes`);
+            } else if (locationTheme === 'industrial' && personality === 'Hardworking and practical') {
+                memberSatisfaction += 6;
+                reaction.reasons.push(`could relate to the working-class themes`);
+            } else if (locationTheme === 'tavern' && personality === 'Gossipy and talkative') {
+                memberSatisfaction += 7;
+                reaction.reasons.push(`loved the social dynamics in the story`);
+            } else if (locationTheme === 'market' && personality === 'Curious Scholar') {
+                memberSatisfaction += 5;
+                reaction.reasons.push(`found the economic aspects fascinating`);
+            }
+        }
+        
         // Convert to bonus/penalty for overall effectiveness
         const memberBonus = Math.round((memberSatisfaction - 50) / 5); // -10 to +10 range roughly
         totalBonus += memberBonus;
@@ -2590,6 +6272,46 @@ function calculateAudienceSatisfaction() {
         bonus: Math.max(-15, Math.min(15, averageBonus)), // Cap the bonus
         individualReactions: individualReactions
     };
+}
+
+function getLocationTheme(location) {
+    // Map location names to themes
+    const locationThemeMap = {
+        'tavern': 'tavern',
+        'market': 'market', 
+        'town_square': 'government',
+        'old_mine': 'industrial',
+        'forest_edge': 'tavern',
+        'river_bank': 'tavern'
+    };
+    
+    // Check if it's a known location with a specific theme
+    if (location.key && locationThemeMap[location.key]) {
+        return locationThemeMap[location.key];
+    }
+    
+    // Default based on location name
+    const name = location.name ? location.name.toLowerCase() : '';
+    if (name.includes('tavern') || name.includes('inn')) return 'tavern';
+    if (name.includes('market') || name.includes('shop')) return 'market';
+    if (name.includes('town') || name.includes('square')) return 'government';
+    if (name.includes('mine') || name.includes('factory')) return 'industrial';
+    
+    return 'tavern'; // Default
+}
+
+function getToneFromResolution(resolutionType) {
+    // Map resolution types to tones
+    const toneMap = {
+        'triumph': 'uplifting',
+        'tragedy': 'melancholy', 
+        'change': 'hopeful',
+        'sacrifice': 'serious',
+        'redemption': 'hopeful',
+        'reconciliation': 'uplifting'
+    };
+    
+    return toneMap[resolutionType] || 'neutral';
 }
 
 function determineStoryTone(story) {
@@ -2784,80 +6506,175 @@ function calculateEarnings(effectiveness) {
 
 function generateConsequences(effectiveness) {
     const consequences = [];
-    const { act1, act2, act3 } = gameState.storyChoices;
+    const story = gameState.storyChoices;
     const townInfo = locations.townInfo || { name: 'this town', type: 'mining' };
-    const storyCharacters = getStoryCharacters();
-    
-    // Generate consequences based on story themes, characters, and effectiveness
-    if (act1.theme === 'industrial' && effectiveness >= 60) {
-        const industrialConsequences = {
-            mining: storyCharacters.protagonist ? 
-                `Young people in the audience exchange excited glances - your tale about ${storyCharacters.protagonist.name} has sparked their imagination about ${townInfo.name}'s former mining glory.` :
-                `Young people in the audience exchange excited glances - your tale has sparked their imagination about ${townInfo.name}'s former mining glory.`,
-            trading: storyCharacters.protagonist ?
-                `Several merchants lean forward with interest - your story about ${storyCharacters.protagonist.name} and the old trading routes has given them new business ideas.` :
-                `Several merchants lean forward with interest - your story about the old trading routes has given them new business ideas.`,
-            farming: storyCharacters.protagonist ?
-                `Farmers in the crowd nod knowingly - your tale about ${storyCharacters.protagonist.name}'s agricultural hardship resonates with their own struggles.` :
-                `Farmers in the crowd nod knowingly - your tale of agricultural hardship resonates with their own struggles.`,
-            coastal: storyCharacters.protagonist ?
-                `Fishermen and sailors exchange glances - your maritime tale about ${storyCharacters.protagonist.name} reminds them of better days at sea.` :
-                `Fishermen and sailors exchange glances - your maritime tale reminds them of better days at sea.`
-        };
-        consequences.push(industrialConsequences[townInfo.type] || `Your tale about ${townInfo.name}'s industrial past strikes a chord with the audience.`);
+    const storyCharacters = story.characters || {};
+    const resolutionType = story.resolution ? story.resolution.type : 'triumph';
+    const eventType = story.event ? story.event.type : 'madeUp';
+    const locationTheme = story.location ? getLocationTheme(story.location) : 'tavern';
+
+    // Resolution type is the primary driver of consequences
+    if (resolutionType) {
+        switch (resolutionType) {
+            case 'triumph':
+                if (effectiveness > 75) {
+                    consequences.push(`Your triumphant tale of ${storyCharacters.protagonist ? storyCharacters.protagonist.name : 'a hero'} has lit a fire in the hearts of the townsfolk! A palpable sense of hope hangs in the air.`);
+                    if (storyCharacters.antagonist) {
+                        consequences.push(`Young folk are already talking about forming an expedition, inspired by ${storyCharacters.protagonist ? storyCharacters.protagonist.name : 'the hero'}'s bold journey.`);
+                    }
+                } else if (effectiveness > 50) {
+                    consequences.push(`A ripple of optimism spreads through the tavern. Your story has reminded them that even in dark times, victory is possible.`);
+                }
+                break;
+            case 'tragedy':
+                if (effectiveness > 75) {
+                    consequences.push(`A respectful silence falls over the tavern. Your tragic tale was so moving that the patrons are buying a round in honor of ${storyCharacters.protagonist ? storyCharacters.protagonist.name : 'the fallen'}.`);
+                    if (eventType === 'confirmed') {
+                        consequences.push(`Several patrons nod grimly, recognizing the harsh truths in your tale. "That's how it really is," someone murmurs into their drink.`);
+                    } else if (eventType === 'rumored') {
+                        consequences.push(`Your tragic tale has given weight to the whispered fears that haunt this town. What was once rumor now feels like inevitable fate.`);
+                    }
+                } else if (effectiveness > 50) {
+                    consequences.push(`The audience is subdued, lost in thought. Your somber story has given them much to reflect upon regarding the town's own hardships.`);
+                }
+                break;
+            case 'change':
+                if (effectiveness > 75) {
+                    consequences.push(`The tavern buzzes with new ideas. Your story of change has challenged old assumptions, and people are eagerly debating what it means for ${townInfo.name}'s future.`);
+                    if (storyCharacters.antagonist) {
+                        consequences.push(`A few patrons cast meaningful glances toward the door, as if expecting ${storyCharacters.antagonist.name} to walk in and prove your story prophetic.`);
+                    }
+                } else if (effectiveness > 50) {
+                    consequences.push(`Nods of understanding are seen around the room. Your tale of adaptation has struck a chord with a populace tired of the status quo.`);
+                }
+                break;
+            case 'redemption':
+                if (effectiveness > 70) {
+                    consequences.push(`The audience seems moved by your tale of redemption. Several patrons are deep in thought about second chances and forgiveness.`);
+                }
+                break;
+            case 'reconciliation':
+                if (effectiveness > 70) {
+                    consequences.push(`Your story of reconciliation has touched many hearts. The tavern feels warmer, as if old grudges are being reconsidered.`);
+                }
+                break;
+        }
     }
-    
-    if (act1.theme === 'market' && effectiveness >= 60) {
-        const marketConsequence = storyCharacters.protagonist ?
-            `Several traders lean forward with interest - your story about ${storyCharacters.protagonist.name} has given them ideas about commerce in ${townInfo.name}.` :
-            `Several traders lean forward with interest - your market tale has given them ideas about commerce in ${townInfo.name}.`;
-        consequences.push(marketConsequence);
-    }
-    
-    if (act1.theme === 'tavern' && effectiveness >= 60) {
-        const tavernConsequence = storyCharacters.protagonist ?
-            `The regulars cheer and raise their mugs - your tale about ${storyCharacters.protagonist.name} resonates with the drinking crowd.` :
-            'The regulars cheer and raise their mugs - your tavern tale resonates with the drinking crowd.';
-        consequences.push(tavernConsequence);
-    }
-    
-    if (act1.theme === 'government' && effectiveness >= 60) {
-        const governmentConsequence = storyCharacters.protagonist ?
-            `Some townsfolk whisper among themselves - your tale about ${storyCharacters.protagonist.name} has them thinking about ${townInfo.name}'s leadership.` :
-            `Some townsfolk whisper among themselves - your political tale has them thinking about ${townInfo.name}'s leadership.`;
-        consequences.push(governmentConsequence);
-    }
-    
-    // Character-specific consequences
-    if (storyCharacters.protagonist && effectiveness >= 70) {
-        if (gameState.knownCharacters[storyCharacters.protagonist.name]) {
-            consequences.push(`People in the audience nod and murmur - they recognize ${storyCharacters.protagonist.name} from your story and will likely treat them differently now.`);
+
+    // Location-based consequences
+    if (locationTheme) {
+        switch (locationTheme) {
+            case 'industrial':
+                if (effectiveness > 70) {
+                    consequences.push(`The old miners in the crowd exchange glances. Your tale has them wondering if there are still treasures to be found in the abandoned shafts.`);
+                }
+                break;
+            case 'market':
+                if (effectiveness > 70) {
+                    consequences.push(`A merchant at the bar starts sketching a rough map on a napkin, muttering about new trade routes inspired by your tale.`);
+                }
+                break;
+            case 'government':
+                if (effectiveness > 70) {
+                    consequences.push(`Suspicious whispers follow your tale. Some patrons are eyeing the town hall with new interest, wondering what secrets might be hidden there.`);
+                }
+                break;
+            case 'tavern':
+                if (effectiveness > 70) {
+                    consequences.push(`The youth in the audience seem particularly inspired. Tomorrow, they may seek out their own adventures, for better or worse.`);
+                }
+                break;
         }
     }
     
-    if (storyCharacters.antagonist && effectiveness >= 60 && act2.theme === 'conflict') {
-        if (gameState.knownCharacters[storyCharacters.antagonist.name]) {
-            consequences.push(`Several audience members cast suspicious glances toward where ${storyCharacters.antagonist.name} usually sits - your story has made them wary.`);
+    // Character relationship consequences based on story content
+    const audienceMembers = gameState.eveningAudience || [];
+    audienceMembers.forEach(audienceMember => {
+        if (audienceMember.character.relationships) {
+            // Create an array of story characters for iteration
+            const storyCharArray = [];
+            if (storyCharacters.protagonist) storyCharArray.push(storyCharacters.protagonist);
+            if (storyCharacters.antagonist) storyCharArray.push(storyCharacters.antagonist);
+            if (storyCharacters.supporting) storyCharArray.push(...storyCharacters.supporting);
+            
+            storyCharArray.forEach(storyChar => {
+                const relationship = audienceMember.character.relationships.find(rel => 
+                    rel.targetName === storyChar.name || rel.targetName === storyChar.character.name
+                );
+                
+                if (relationship) {
+                    // Story affects relationships between characters
+                    const storyTone = getToneFromResolution(resolutionType);
+                    
+                    // Positive stories about friends/family improve relationships
+                    if ((relationship.relationshipType === 'friend' || relationship.relationshipType === 'family_member') && 
+                        effectiveness > 70 && storyTone === 'uplifting') {
+                        consequences.push(`${audienceMember.name} and ${storyChar.name} seem closer after your story`);
+                    }
+                    
+                    // Negative stories about enemies can create tension
+                    if (relationship.relationshipType === 'enemy' && effectiveness < 40) {
+                        consequences.push(`${audienceMember.name} looks uncomfortable about the story involving ${storyChar.name}`);
+                    }
+                    
+                    // Revealing secrets can have consequences
+                    if (eventType === 'confirmed' && audienceMember.character.secrets) {
+                        const relevantSecret = audienceMember.character.secrets.find(secret => 
+                            secret.text.toLowerCase().includes(storyChar.name.toLowerCase())
+                        );
+                        
+                        if (relevantSecret && relevantSecret.type === 'scandal') {
+                            consequences.push(`${audienceMember.name} looks concerned about the sensitive information in your story`);
+                        }
+                    }
+                }
+            });
+        }
+    });
+    
+    // Enhanced consequences based on the truthfulness and theme combination of the story.
+    const truthType = eventType;
+    const storyTheme = locationTheme;
+    
+    if (truthType === 'madeUp' && effectiveness > 80) {
+        if (storyTheme === 'industrial') {
+            consequences.push(`A child tugs at their parent's sleeve, asking if the magical mine spirits you described might still be living in the old shafts.`);
+        } else if (storyTheme === 'market') {
+            consequences.push(`The local shopkeeper is now convinced that enchanted goods might actually exist, and is asking travelers about magical wares.`);
+        } else {
+            consequences.push(`Your fantastical tale was so captivating that a child in the audience now claims to have seen the magical creatures you described.`);
+        }
+    } else if (truthType === 'rumored' && effectiveness > 70) {
+        if (storyTheme === 'government') {
+            consequences.push(`Your story has elevated political rumors to the status of accepted truth. The next town meeting may be more contentious than usual.`);
+        } else {
+            consequences.push(`Your story, based on a rumor, is now being repeated as fact. The line between what happened and what was said has blurred a little more.`);
+        }
+    } else if (truthType === 'confirmed' && effectiveness < 30) {
+        consequences.push(`Your painfully truthful story was also painfully dull. The audience seems more bored than informed, preferring their harsh realities with a bit more seasoning.`);
+    }
+
+    // Specific consequences based on town type and story theme alignment
+    if (storyTheme === townInfo.type || (storyTheme === 'industrial' && ['mining', 'coastal'].includes(townInfo.type))) {
+        if (effectiveness > 65) {
+            consequences.push(`Your tale hits close to home for the people of ${townInfo.name}. Several patrons approach you after the performance, sharing their own similar experiences.`);
         }
     }
-    
-    if (act3.theme === 'triumph' && effectiveness >= 70) {
-        consequences.push(`The tavern keeper nods approvingly - your inspiring tale has lifted the spirits of ${townInfo.name}'s people.`);
-    }
-    
-    if (act2.theme === 'discovery' && effectiveness >= 50) {
-        const discoveryConsequence = storyCharacters.protagonist ?
-            `Several townspeople seem to be making mental notes about ${storyCharacters.protagonist.name} - your story has given them ideas.` :
-            'Several townspeople seem to be making mental notes - your story has given them ideas.';
-        consequences.push(discoveryConsequence);
-    }
-    
+
+    // Low effectiveness fallback with more specific reasons
     if (effectiveness < 40) {
-        consequences.push('The crowd disperses quickly - your lackluster performance won\'t be remembered fondly.');
+        if (truthType === 'madeUp' && tone === 'tragic') {
+            consequences.push('Your fantastical tragedy confuses more than it moves. The audience struggles to connect with both the unrealistic elements and the sorrowful ending.');
+        } else if (truthType === 'confirmed' && tone === 'triumphant') {
+            consequences.push('Your realistic tale of triumph rings hollow in a room full of people facing harsh realities. They need more than simple optimism.');
+        } else {
+            consequences.push('Your story falls flat. The audience begins their own conversations, ignoring you completely. The night will not be a profitable one.');
+        }
     }
     
+    // Generic fallback if no other consequence was generated
     if (consequences.length === 0) {
-        consequences.push(`Your story entertains the crowd in ${townInfo.name} but doesn't seem to have any lasting impact.`);
+        consequences.push(`Your story was pleasant enough, but it vanishes from memory as quickly as the foam on the ale.`);
     }
     
     return consequences;
@@ -3854,6 +7671,9 @@ function nextDay() {
         return; // Game over screen already shown
     }
     
+    // --- PROCESS NIGHTLY EVENTS FIRST ---
+    processNightlyEvents();
+    
     gameState.day++;
     gameState.daysSinceLastMove++; // Track how long we've been in this town
     gameState.currentPhase = 'day';
@@ -3868,6 +7688,46 @@ function nextDay() {
     gameState.eveningAudience = []; // Clear last night's audience
     gameState.audienceReactions = []; // Clear last night's reactions
     
+    // --- EVOLVE STORY ELEMENTS AFTER NIGHTLY EVENTS ---
+    if (locations && locations.townInfo) {
+        evolveStoryElements(locations.townInfo.type);
+    }
+
+    // --- Assign new info and dialogue to each NPC for the new day, with memory ---
+    if (locations && locations.townInfo) {
+        // Get evolved story elements for the town
+        const storyElements = distributeStoryElements(locations.townInfo.type);
+        Object.keys(locations).forEach(locationKey => {
+            const location = locations[locationKey];
+            if (location && location.npcs) {
+                location.npcs.forEach(npc => {
+                    // Initialize toldInfo memory if not present
+                    if (!npc.toldInfo) npc.toldInfo = [];
+                    // Filter out already-told info
+                    const available = storyElements.filter(e => !npc.toldInfo.some(told => told.text === e.text));
+                    let chosenInfo;
+                    if (available.length > 0) {
+                        chosenInfo = available[Math.floor(Math.random() * available.length)];
+                    } else {
+                        // All info exhausted, reset memory and pick anew
+                        npc.toldInfo = [];
+                        chosenInfo = storyElements[Math.floor(Math.random() * storyElements.length)];
+                    }
+                    // Assign and remember
+                    npc.info = {
+                        text: chosenInfo.text,
+                        type: chosenInfo.type,
+                        source: npc.name,
+                        evolutionHistory: chosenInfo.evolutionHistory || []
+                    };
+                    npc.toldInfo.push(chosenInfo);
+                    // Regenerate dialogue with new info
+                    npc.dialogue = generateDialogue(npc.character, npc.info);
+                });
+            }
+        });
+    }
+
     // Reset UI
     document.getElementById('night-phase').classList.add('hidden');
     document.getElementById('day-phase').classList.remove('hidden');
@@ -4113,7 +7973,14 @@ function resetGame() {
         health: 100,
         consecutiveBadPerformances: 0,
         gameOverReason: null,
-        warningsGiven: 0
+        warningsGiven: 0,
+        // NEW: Story evolution system
+        townStoryState: {}, // Track evolving state of story elements in current town
+        // --- Living World System ---
+        townEvents: [], // Array of events generated each night
+        knownRumors: [], // Array of rumors the player has discovered
+        eventLog: [], // Dwarf Fortress-style event log
+        eventSeeds: [] // Seeds created from stories that influence future events
     };
     
     // Generate new random characters for the fresh game
@@ -4152,7 +8019,7 @@ function loadInstructionsContent() {
         <div style="line-height: 1.6;">
             <section style="margin-bottom: 25px;">
                 <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🎯 Game Objective</h3>
-                <p>Earn <strong>${gameState.retirementGoal.toLocaleString()} gold</strong> to retire comfortably! Each night costs ${gameState.innCostPerNight} gold for lodging (varies by town), and poor reputation can get you chased from town.</p>
+                <p>Earn <strong>${gameState.retirementGoal.toLocaleString()} gold</strong> to retire comfortably! Each night costs ${gameState.innCostPerNight} gold for lodging (varies by town), and poor reputation can get you chased out of town.</p>
             </section>
 
             <section style="margin-bottom: 25px;">
@@ -4244,6 +8111,273 @@ function loadInstructionsContent() {
             </section>
         </div>
     `;
+}
+
+function selectChoice(act, theme, type) {
+    // Store the selected choice
+    gameState.storyChoices[act] = { theme, type };
+    
+    // For Act 1, store the story characters to be used consistently across all acts
+    if (act === 'act1') {
+        const choiceKey = `${theme}-${type}`;
+        gameState.storyCharacters = gameState.act1ChoiceData[choiceKey];
+    }
+    
+    // Update the selected choice display
+    const selectedDiv = document.getElementById(`${act}-selected`);
+    const choiceText = act === 'act1' ? 
+        storyTemplates.act1[theme][type] :
+        (act === 'act2' ? 
+            generateAct2Text(gameState.storyChoices.act1, theme, type, getStoryCharacters()) :
+            generateAct3Text(gameState.storyChoices.act1, gameState.storyChoices.act2, theme, type, getStoryCharacters())
+        );
+    
+    selectedDiv.innerHTML = `
+        <div class="choice-text">Selected: ${choiceText}</div>
+        <div class="choice-source">Theme: ${theme}, Style: ${type}</div>
+    `;
+    
+    // Mark all choices in this act as unselected, then mark the clicked one as selected
+    const allChoices = document.querySelectorAll(`#${act}-choices .choice`);
+    allChoices.forEach(choice => choice.classList.remove('selected'));
+    
+    // Find and mark the selected choice
+    allChoices.forEach(choice => {
+        const choiceTextElement = choice.querySelector('.choice-text');
+        if (choiceTextElement && choiceTextElement.textContent === choiceText) {
+            choice.classList.add('selected');
+        }
+    });
+    
+    // Generate next act choices if needed
+    if (act === 'act1') {
+        generateAct2Choices();
+    } else if (act === 'act2') {
+        generateAct3Choices();
+    }
+    
+    // Update story preview and tell story button
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+// Selection functions for the new story creation system
+function selectCharacter(role, character) {
+    if (!gameState.storyChoices.characters) {
+        gameState.storyChoices.characters = {};
+    }
+    
+    if (role === 'supporting') {
+        if (!gameState.storyChoices.characters.supporting) {
+            gameState.storyChoices.characters.supporting = [];
+        }
+        if (gameState.storyChoices.characters.supporting.length < 2) {
+            gameState.storyChoices.characters.supporting.push(character);
+        }
+    } else {
+        gameState.storyChoices.characters[role] = character;
+    }
+    
+    // Regenerate the character selection UI to update available choices
+    generateCharacterSelectionChoices();
+    updateStoryPreview();
+    updateTellStoryButton();
+    
+    // Check if we should progress to Phase 2
+    checkPhaseProgression();
+}
+
+function displaySelectedCharacters() {
+    const act1Choices = document.getElementById('act1-choices');
+    const selected = gameState.storyChoices.characters || {};
+    
+    // Remove existing selected characters display
+    const existingDisplay = act1Choices.querySelector('.selected-characters-display');
+    if (existingDisplay) {
+        existingDisplay.remove();
+    }
+    
+    // Create new selected characters display
+    const selectedDisplay = document.createElement('div');
+    selectedDisplay.className = 'selected-characters-display';
+    selectedDisplay.style.cssText = 'margin-top: 20px; padding: 15px; background: rgba(255, 215, 0, 0.1); border: 2px solid #daa520; border-radius: 8px;';
+    
+    let displayText = '<h4 style="color: #daa520; margin-bottom: 10px;">Selected Cast (click to remove):</h4>';
+    
+    if (selected.protagonist) {
+        displayText += `<div style="margin: 5px 0; cursor: pointer; padding: 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.3);" onclick="removeCharacter('protagonist')"><strong>Protagonist:</strong> ${selected.protagonist.name} (${selected.protagonist.character.profession}) <span style="color: #ff4444;">[×]</span></div>`;
+    }
+    
+    if (selected.antagonist) {
+        displayText += `<div style="margin: 5px 0; cursor: pointer; padding: 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.3);" onclick="removeCharacter('antagonist')"><strong>Antagonist:</strong> ${selected.antagonist.name} (${selected.antagonist.character.profession}) <span style="color: #ff4444;">[×]</span></div>`;
+    }
+    
+    if (selected.supporting && selected.supporting.length > 0) {
+        selected.supporting.forEach((char, index) => {
+            displayText += `<div style="margin: 5px 0; cursor: pointer; padding: 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.3);" onclick="removeSupportingCharacter(${index})"><strong>Supporting:</strong> ${char.name} (${char.character.profession}) <span style="color: #ff4444;">[×]</span></div>`;
+        });
+    }
+    
+    if (!selected.protagonist && !selected.antagonist && (!selected.supporting || selected.supporting.length === 0)) {
+        displayText += '<div style="color: #999; font-style: italic;">No characters selected yet</div>';
+    }
+    
+    selectedDisplay.innerHTML = displayText;
+    act1Choices.appendChild(selectedDisplay);
+}
+
+function selectLocation(location) {
+    gameState.storyChoices.location = location;
+    
+    // Update UI
+    const choices = document.querySelectorAll('#act2-choices .choice');
+    choices.forEach(choice => choice.classList.remove('selected'));
+    
+    // Find and mark the selected choice
+    choices.forEach(choice => {
+        const choiceText = choice.querySelector('.choice-text');
+        if (choiceText && choiceText.textContent.includes(location.name)) {
+            choice.classList.add('selected');
+        }
+    });
+    
+    updateStoryPreview();
+    updateTellStoryButton();
+    
+    // Check if we should progress to Phase 3
+    checkPhaseProgression();
+}
+
+function selectEvent(event) {
+    gameState.storyChoices.event = event;
+    
+    // Update UI
+    const choices = document.querySelectorAll('#act2-choices .choice');
+    choices.forEach(choice => choice.classList.remove('selected'));
+    
+    // Find and mark the selected choice
+    choices.forEach(choice => {
+        const choiceText = choice.querySelector('.choice-text');
+        if (choiceText && choiceText.textContent.includes(event.text)) {
+            choice.classList.add('selected');
+        }
+    });
+    
+    updateStoryPreview();
+    updateTellStoryButton();
+    
+    // Check if we should progress to Phase 4
+    checkPhaseProgression();
+}
+
+function selectResolution(resolution) {
+    gameState.storyChoices.resolution = resolution;
+    
+    // Update UI
+    const choices = document.querySelectorAll('#act3-choices .choice');
+    choices.forEach(choice => choice.classList.remove('selected'));
+    
+    // Find and mark the selected choice
+    choices.forEach(choice => {
+        const choiceText = choice.querySelector('.choice-text');
+        if (choiceText && choiceText.textContent.includes(resolution.text)) {
+            choice.classList.add('selected');
+        }
+    });
+    
+    updateStoryPreview();
+    updateTellStoryButton();
+}
+
+function removeCharacter(role) {
+    if (gameState.storyChoices.characters) {
+        delete gameState.storyChoices.characters[role];
+        
+        // If we removed the protagonist, go back to Phase 1
+        if (role === 'protagonist') {
+            // Clear later phases
+            delete gameState.storyChoices.location;
+            delete gameState.storyChoices.event;
+            delete gameState.storyChoices.resolution;
+            generateCharacterSelectionChoices();
+        } else {
+            generateCharacterSelectionChoices();
+        }
+        
+        updateStoryPreview();
+        updateTellStoryButton();
+    }
+}
+
+function checkPhaseProgression() {
+    const story = gameState.storyChoices;
+    
+    // Phase 1 to Phase 2: Need protagonist
+    if (!story.location && story.characters && story.characters.protagonist) {
+        generateLocationSelectionChoices();
+        return;
+    }
+    
+    // Phase 2 to Phase 3: Need location
+    if (!story.event && story.location) {
+        generateEventSelectionChoices();
+        return;
+    }
+    
+    // Phase 3 to Phase 4: Need event
+    if (!story.resolution && story.event) {
+        generateResolutionSelectionChoices();
+        return;
+    }
+}
+
+function removeSupportingCharacter(index) {
+    if (gameState.storyChoices.characters && gameState.storyChoices.characters.supporting) {
+        gameState.storyChoices.characters.supporting.splice(index, 1);
+        generateCharacterSelectionChoices();
+        updateStoryPreview();
+        updateTellStoryButton();
+    }
+}
+
+function updateCharacterSelectionUI() {
+    const act1Choices = document.getElementById('act1-choices');
+    const selected = gameState.storyChoices.characters || {};
+    
+    // Clear all selections first
+    const allChoices = act1Choices.querySelectorAll('.choice');
+    allChoices.forEach(choice => choice.classList.remove('selected'));
+    
+    // Mark protagonist selection
+    if (selected.protagonist) {
+        const protagChoices = act1Choices.querySelectorAll('.choice');
+        protagChoices.forEach(choice => {
+            if (choice.textContent.includes(selected.protagonist.name)) {
+                choice.classList.add('selected');
+            }
+        });
+    }
+    
+    // Mark antagonist selection
+    if (selected.antagonist) {
+        const antagChoices = act1Choices.querySelectorAll('.choice');
+        antagChoices.forEach(choice => {
+            if (choice.textContent.includes(selected.antagonist.name)) {
+                choice.classList.add('selected');
+            }
+        });
+    }
+    
+    // Mark supporting characters selection
+    if (selected.supporting) {
+        const supportChoices = act1Choices.querySelectorAll('.choice');
+        supportChoices.forEach(choice => {
+            const isSelected = selected.supporting.some(char => choice.textContent.includes(char.name));
+            if (isSelected) {
+                choice.classList.add('selected');
+            }
+        });
+    }
 }
 
 // Initialize game when page loads
