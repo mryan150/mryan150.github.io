@@ -94,7 +94,12 @@ let gameState = {
     townEvents: [], // Array of events generated each night
     knownRumors: [], // Array of rumors the player has discovered
     eventLog: [], // Dwarf Fortress-style event log
-    eventSeeds: [] // Seeds created from stories that influence future events
+    eventSeeds: [], // Seeds created from stories that influence future events
+    // Bard consequence tracking
+    availableOpportunities: [], // Special opportunities unlocked by events
+    bardNotifications: [], // Positive story material and achievements
+    bardWarnings: [], // Warnings about potential negative consequences
+    pendingEventNotifications: [] // Notifications to show player about event impacts
 };
 
 // --- CHARACTER-LOCATION COMPATIBILITY SYSTEM ---
@@ -494,6 +499,21 @@ const eventTypes = {
         name: "Political Event",
         icon: "🏛️",
         color: "#4169e1"
+    },
+    natural: {
+        name: "Natural Event",
+        icon: "🌿",
+        color: "#32cd32"
+    },
+    seasonal: {
+        name: "Seasonal Event",
+        icon: "🍂",
+        color: "#cd853f"
+    },
+    demographic: {
+        name: "Population Event",
+        icon: "👨‍👩‍👧‍👦",
+        color: "#20b2aa"
     }
 };
 
@@ -838,8 +858,8 @@ function processNightlyEvents() {
     const npcs = locations.allNPCs;
     const storyConsequences = gameState.consequences || [];
     
-    // Generate events using the new seeded system
-    const events = generateSeededEvents(townInfo, npcs, storyConsequences);
+    // Generate events using the new balanced system
+    const events = generateBalancedEvents(townInfo, npcs, storyConsequences);
     
     // Process each event
     events.forEach(event => {
@@ -859,7 +879,9 @@ function processNightlyEvents() {
         });
     });
     
-    console.log(`Generated ${events.length} nightly events for ${townInfo.name} (${events.filter(e => e.seed).length} from story seeds)`);
+    const naturalEvents = events.filter(e => !e.seed).length;
+    const storyEvents = events.filter(e => e.seed).length;
+    console.log(`Generated ${events.length} nightly events for ${townInfo.name} (${naturalEvents} natural, ${storyEvents} story-influenced)`);
 }
 
 // --- STORY-DRIVEN EVENT MANIPULATION SYSTEM ---
@@ -1005,34 +1027,533 @@ function seedEventsFromStory(storyChoices) {
     console.log(`Added ${newSeeds.length} event seeds from story:`, newSeeds);
 }
 
-// Enhanced event generation that uses story seeds
-function generateSeededEvents(townInfo, npcs, storyConsequences) {
+// Balanced event generation - world-driven with story influence
+function generateBalancedEvents(townInfo, npcs, storyConsequences) {
     const events = [];
     const seeds = gameState.eventSeeds || [];
+    const targetEventCount = 1 + Math.floor(Math.random() * 3); // 1-3 events total
     
-    // First, try to generate events from seeds (higher priority)
+    // 1. NATURAL WORLD EVENTS (60% of events) - happen regardless of bard
+    const naturalEventCount = Math.floor(targetEventCount * 0.6) + (Math.random() < 0.6 ? 1 : 0);
+    for (let i = 0; i < naturalEventCount; i++) {
+        const naturalEvent = generateNaturalWorldEvent(townInfo, npcs, storyConsequences);
+        if (naturalEvent) {
+            events.push(naturalEvent);
+            console.log(`Generated natural event: ${naturalEvent.title}`);
+        }
+    }
+    
+    // 2. STORY-INFLUENCED EVENTS (30% of events) - affected by bard's stories  
+    const storyEventCount = Math.floor(targetEventCount * 0.3);
+    let storyEventsGenerated = 0;
     seeds.forEach(seed => {
-        if (Math.random() < 0.7) { // 70% chance to manifest each seed
+        if (storyEventsGenerated < storyEventCount && Math.random() < 0.4) { // Lower chance, more selective
             const seededEvent = generateEventFromSeed(seed, townInfo, npcs, storyConsequences);
             if (seededEvent) {
                 events.push(seededEvent);
-                console.log(`Generated seeded event: ${seededEvent.title} (from: ${seed.reason})`);
+                storyEventsGenerated++;
+                console.log(`Generated story-influenced event: ${seededEvent.title} (from: ${seed.reason})`);
             }
         }
     });
     
-    // Then fill in with regular random events if needed
-    const targetEventCount = 1 + Math.floor(Math.random() * 2); // 1-2 events total
-    while (events.length < targetEventCount) {
+    // 3. RANDOM FILLER EVENTS (10% of events) - pure chaos
+    while (events.length < targetEventCount && Math.random() < 0.3) {
         const randomEvent = generateRandomEvent(townInfo, npcs, storyConsequences);
         if (randomEvent) {
             events.push(randomEvent);
+            console.log(`Generated random event: ${randomEvent.title}`);
         } else {
-            break; // Couldn't generate more events
+            break;
         }
     }
     
     return events;
+}
+
+// Natural world events that happen due to organic town dynamics
+function generateNaturalWorldEvent(townInfo, npcs, storyConsequences) {
+    const naturalEventTypes = [
+        'economic_cycle',
+        'seasonal_change', 
+        'character_development',
+        'social_dynamics',
+        'political_shift',
+        'natural_occurrence',
+        'trade_fluctuation',
+        'demographic_change'
+    ];
+    
+    const eventType = randomChoice(naturalEventTypes);
+    
+    switch (eventType) {
+        case 'economic_cycle':
+            return generateEconomicCycleEvent(townInfo, npcs);
+        case 'seasonal_change':
+            return generateSeasonalEvent(townInfo, npcs);
+        case 'character_development':
+            return generateNaturalCharacterEvent(townInfo, npcs);
+        case 'social_dynamics':
+            return generateSocialDynamicsEvent(townInfo, npcs);
+        case 'political_shift':
+            return generatePoliticalEvent(townInfo, npcs);
+        case 'natural_occurrence':
+            return generateNaturalOccurrenceEvent(townInfo, npcs);
+        case 'trade_fluctuation':
+            return generateTradeEvent(townInfo, npcs);
+        case 'demographic_change':
+            return generateDemographicEvent(townInfo, npcs);
+        default:
+            return null;
+    }
+}
+
+function generateEconomicCycleEvent(townInfo, npcs) {
+    const economicEvents = [
+        {
+            title: 'Seasonal Trade Cycle',
+            description: `${townInfo.name} experiences its predictable seasonal trade fluctuation. ${townInfo.type === 'mining' ? 'Winter mining yields are lower due to harsh conditions' : townInfo.type === 'farming' ? 'Post-harvest economic adjustment affects the local market' : 'Seasonal trading patterns shift the town\'s prosperity'}.`,
+            type: 'economic',
+            effects: () => {
+                const fluctuation = Math.random() < 0.5 ? 1 : -1;
+                gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight + fluctuation);
+            }
+        },
+        {
+            title: 'Resource Depletion Cycle',
+            description: `Natural resource cycles affect ${townInfo.name}. ${townInfo.type === 'mining' ? 'The easily accessible ore veins are showing signs of depletion' : townInfo.type === 'farming' ? 'Soil fertility varies with natural cycles' : 'Local resources ebb and flow with natural patterns'}.`,
+            type: 'economic',
+            effects: () => {
+                // Natural economic pressure
+                if (Math.random() < 0.3) {
+                    gameState.innCostPerNight += 1;
+                }
+            }
+        }
+    ];
+    
+    const event = randomChoice(economicEvents);
+    return {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: event.effects
+    };
+}
+
+function generateSeasonalEvent(townInfo, npcs) {
+    const seasonalEvents = [
+        {
+            title: 'Weather Pattern Shift',
+            description: `A change in weather patterns affects daily life in ${townInfo.name}. ${townInfo.type === 'coastal' ? 'Storm seasons bring both challenges and opportunities' : townInfo.type === 'farming' ? 'Changing weather affects crop planning and community schedules' : 'The town adapts to seasonal weather changes'}.`,
+            type: 'town'
+        },
+        {
+            title: 'Natural Cycles',
+            description: `The natural world around ${townInfo.name} follows its ancient rhythms. ${townInfo.type === 'farming' ? 'Wildlife migration patterns affect local hunting and farming' : townInfo.type === 'coastal' ? 'Tidal and fish migration patterns shift' : 'Forest and mountain cycles influence the community'}.`,
+            type: 'town'
+        }
+    ];
+    
+    const event = randomChoice(seasonalEvents);
+    return {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: () => {
+            // Seasonal changes affect NPC moods naturally
+            npcs.forEach(npc => {
+                if (Math.random() < 0.2 && npc.character.psychologicalProfile) {
+                    const seasonalMoods = ['content', 'restless', 'contemplative', 'energetic'];
+                    npc.character.psychologicalProfile.emotionalState = randomChoice(seasonalMoods);
+                }
+            });
+        }
+    };
+}
+
+function generateNaturalCharacterEvent(townInfo, npcs) {
+    // Characters develop and change on their own, not just because of bard stories
+    const developingNPC = randomChoice(npcs);
+    if (!developingNPC) return null;
+    
+    const developmentEvents = [
+        {
+            title: `${developingNPC.name} Faces Personal Challenge`,
+            description: `${developingNPC.name} is dealing with a personal challenge that has nothing to do with recent events. Like everyone, they face the ongoing struggles of daily life in ${townInfo.name}.`,
+            characters: [developingNPC.name],
+            effects: () => {
+                if (developingNPC.character.psychologicalProfile) {
+                    const challengeStates = ['stressed', 'determined', 'thoughtful', 'resilient'];
+                    developingNPC.character.psychologicalProfile.emotionalState = randomChoice(challengeStates);
+                }
+            }
+        },
+        {
+            title: `${developingNPC.name} Achieves Personal Goal`,
+            description: `${developingNPC.name} has been working toward something personal and has made progress. Their own efforts and determination are paying off, independent of outside influence.`,
+            characters: [developingNPC.name],
+            effects: () => {
+                if (developingNPC.character.psychologicalProfile) {
+                    developingNPC.character.psychologicalProfile.emotionalState = 'accomplished';
+                }
+            }
+        }
+    ];
+    
+    const event = randomChoice(developmentEvents);
+    return {
+        type: 'character',
+        title: event.title,
+        description: event.description,
+        characters: event.characters,
+        effects: event.effects
+    };
+}
+
+function generateSocialDynamicsEvent(townInfo, npcs) {
+    const socialEvents = [
+        {
+            title: 'Community Dynamics Shift',
+            description: `Social relationships in ${townInfo.name} evolve naturally as people interact in their daily lives. Friendships strengthen, disagreements arise, and the social fabric of the community changes organically.`,
+            type: 'social',
+            effects: () => {
+                // Natural relationship evolution
+                npcs.forEach(npc => {
+                    if (Math.random() < 0.15 && npc.character.relationships) {
+                        const randomRel = randomChoice(npc.character.relationships);
+                        if (Math.random() < 0.5) {
+                            randomRel.intensity = Math.min(5, randomRel.intensity + 1);
+                        } else {
+                            randomRel.intensity = Math.max(1, randomRel.intensity - 1);
+                        }
+                    }
+                });
+            }
+        },
+        {
+            title: 'Generational Change',
+            description: `${townInfo.name} experiences the natural progression of generations. Older residents share wisdom with younger ones, while new perspectives challenge established ways of thinking.`,
+            type: 'social',
+            effects: () => {
+                // Some NPCs naturally become more open or conservative
+                npcs.forEach(npc => {
+                    if (Math.random() < 0.1) {
+                        // Natural personality development
+                        const traits = ['wise', 'traditional', 'progressive', 'experienced'];
+                        if (npc.character.personalityTrait) {
+                            npc.character.personalityTrait.secondaryTrait = randomChoice(traits);
+                        }
+                    }
+                });
+            }
+        }
+    ];
+    
+    const event = randomChoice(socialEvents);
+    return {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: event.effects
+    };
+}
+
+function generatePoliticalEvent(townInfo, npcs) {
+    const politicalEvents = [
+        {
+            title: 'New Inn Licensing Tax',
+            description: `Regional authorities have imposed a new licensing tax on all inns and taverns in ${townInfo.name}. The tax is intended to fund road maintenance and regional security, but innkeepers are passing the cost directly to guests.`,
+            type: 'political',
+            effects: () => {
+                const oldCost = gameState.innCostPerNight;
+                gameState.innCostPerNight += 2;
+                return { costChange: gameState.innCostPerNight - oldCost, reason: 'inn licensing tax' };
+            }
+        },
+        {
+            title: 'Performer Registration Requirement',
+            description: `New regulations require all traveling performers to register with local authorities and pay a performance fee. ${townInfo.name} officials are now collecting 3 gold from entertainers as a "public safety measure" to track who performs in town.`,
+            type: 'political',
+            effects: () => {
+                gameState.gold = Math.max(0, gameState.gold - 3);
+                return { goldChange: -3, reason: 'performer registration fee' };
+            }
+        },
+        {
+            title: 'Trade Route Security Tax',
+            description: `Regional authorities have increased security patrols on trade routes, funded by a new merchant tax. ${townInfo.name} merchants are charging higher prices to cover the tax, but the increased security has made some wealthy traders more generous with tips.`,
+            type: 'political',
+            effects: () => {
+                const costIncrease = Math.random() < 0.7 ? 1 : 0;
+                if (costIncrease) {
+                    gameState.innCostPerNight += 1;
+                }
+                return { 
+                    costChange: costIncrease, 
+                    tipBonus: true, 
+                    reason: 'trade security tax' 
+                };
+            }
+        },
+        {
+            title: 'Currency Standardization Decree',
+            description: `Regional authorities have decreed that all transactions must use the new standardized regional currency. ${townInfo.name} is adjusting to the conversion rates, which has temporarily disrupted local pricing. Some goods are now cheaper, others more expensive.`,
+            type: 'political',
+            effects: () => {
+                const adjustment = Math.random() < 0.5 ? -1 : 1;
+                gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight + adjustment);
+                const goldAdjustment = Math.floor(gameState.gold * 0.05) * (Math.random() < 0.5 ? -1 : 1);
+                gameState.gold = Math.max(0, gameState.gold + goldAdjustment);
+                return { 
+                    costChange: adjustment, 
+                    goldChange: goldAdjustment, 
+                    reason: 'currency standardization' 
+                };
+            }
+        },
+        {
+            title: 'Curfew Enforcement Initiative',
+            description: `Regional authorities have mandated stricter evening curfews to "maintain public order." ${townInfo.name} now restricts public gatherings after dark, which means fewer people can attend evening performances. Tavern owners are frustrated by the reduced business.`,
+            type: 'political',
+            effects: () => {
+                // Reduce potential audience size for evening performances
+                gameState.audienceRestriction = 'curfew';
+                return { audienceImpact: true, reason: 'curfew enforcement' };
+            }
+        },
+        {
+            title: 'Vagrancy Prevention Act',
+            description: `New regional laws require all travelers to demonstrate "legitimate business" or face vagrancy charges. ${townInfo.name} officials are demanding proof of income from visiting performers. Those who can't show sufficient funds face additional fees.`,
+            type: 'political',
+            effects: () => {
+                if (gameState.gold < 20) {
+                    gameState.gold = Math.max(0, gameState.gold - 5);
+                    return { goldChange: -5, reason: 'vagrancy prevention fee' };
+                }
+                return { wealthCheck: true, reason: 'vagrancy prevention (avoided due to sufficient funds)' };
+            }
+        },
+        {
+            title: 'Regional Storytelling Content Review',
+            description: `New regulations require "morally appropriate" content in public performances. ${townInfo.name} has appointed a content reviewer who may fine performers for "inappropriate themes." Certain story types now carry risk of penalties.`,
+            type: 'political',
+            effects: () => {
+                gameState.contentRestrictions = true;
+                return { storyRestrictions: true, reason: 'content review regulations' };
+            }
+        },
+        {
+            title: 'Crown Revenue Collection Drive',
+            description: `Regional tax collectors are conducting an intensive revenue collection campaign. ${townInfo.name} businesses are being squeezed for back taxes, and some are struggling. The economic pressure means people have less to spend on entertainment.`,
+            type: 'political',
+            effects: () => {
+                // Reduce gold gains from performances for a few days
+                if (!gameState.economicConditions) gameState.economicConditions = {};
+                gameState.economicConditions.taxPressure = gameState.day + 3; // Lasts 3 days
+                gameState.innCostPerNight += 1;
+                return { economicPressure: true, costChange: 1, reason: 'crown tax collection' };
+            }
+        }
+    ];
+    
+    const event = randomChoice(politicalEvents);
+    const result = {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        politicalConsequences: null,
+        effects: () => {
+            const consequences = event.effects();
+            result.politicalConsequences = consequences;
+        }
+    };
+    
+    return result;
+}
+
+function generateNaturalOccurrenceEvent(townInfo, npcs) {
+    const naturalEvents = [
+        {
+            title: 'Natural Discovery',
+            description: `Someone in ${townInfo.name} makes an interesting natural discovery. ${townInfo.type === 'mining' ? 'A new mineral formation is found' : townInfo.type === 'farming' ? 'An unusual plant growth pattern is noticed' : townInfo.type === 'coastal' ? 'Something interesting washes ashore' : 'Nature reveals something unexpected'}.`,
+            type: 'mystery'
+        },
+        {
+            title: 'Environmental Shift',
+            description: `The natural environment around ${townInfo.name} experiences a subtle change. ${townInfo.type === 'coastal' ? 'Ocean currents shift slightly' : townInfo.type === 'farming' ? 'Soil conditions vary naturally' : 'The local ecosystem adapts and changes'}.`,
+            type: 'town'
+        }
+    ];
+    
+    const event = randomChoice(naturalEvents);
+    return {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: () => {
+            // Natural events sometimes create new rumors
+            if (Math.random() < 0.4 && gameState.townStoryState?.elements) {
+                gameState.townStoryState.elements.push({
+                    id: `natural_rumor_${Date.now()}_${Math.random()}`,
+                    originalText: "Something unusual was discovered in the natural world around town",
+                    originalType: 'rumored',
+                    currentType: 'rumored',
+                    category: 'natural_phenomena',
+                    dayAdded: gameState.day,
+                    evolutionHistory: [`Day ${gameState.day}: Natural discovery created local interest`]
+                });
+            }
+        }
+    };
+}
+
+function generateTradeEvent(townInfo, npcs) {
+    const tradeEvents = [
+        {
+            title: 'Trading Partner Shift',
+            description: `${townInfo.name}'s trading relationships experience natural changes. Some partnerships strengthen while others weaken based on practical considerations and changing needs.`,
+            type: 'economic',
+            effects: () => {
+                const tradeChange = Math.random() < 0.5 ? 1 : -1;
+                gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight + tradeChange);
+            }
+        },
+        {
+            title: 'Supply Chain Adjustment',
+            description: `Regional supply chains adjust to new conditions. ${townInfo.name} adapts to changes in the availability and cost of goods from distant sources.`,
+            type: 'economic',
+            effects: () => {
+                // Market forces affect local prices
+                if (Math.random() < 0.4) {
+                    gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight + (Math.random() < 0.5 ? 1 : -1));
+                }
+            }
+        }
+    ];
+    
+    const event = randomChoice(tradeEvents);
+    return {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: event.effects
+    };
+}
+
+function generateDemographicEvent(townInfo, npcs) {
+    const demographicEvents = [
+        {
+            title: 'Population Natural Change',
+            description: `${townInfo.name} experiences natural demographic shifts. Some families grow, others move on, and new people arrive seeking opportunities - the natural ebb and flow of community life.`,
+            type: 'social'
+        },
+        {
+            title: 'Skill Distribution Evolution',
+            description: `The mix of skills and professions in ${townInfo.name} evolves naturally. As people retire, start new careers, or develop expertise, the community's capabilities gradually shift.`,
+            type: 'social'
+        }
+    ];
+    
+    const event = randomChoice(demographicEvents);
+    return {
+        type: event.type,
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: () => {
+            // Demographic changes subtly affect the social environment
+            npcs.forEach(npc => {
+                if (Math.random() < 0.05) {
+                    // Very small chance of profession evolution (natural career development)
+                    const relatedProfessions = {
+                        'Farmer': ['Merchant', 'Miller'],
+                        'Merchant': ['Trader', 'Shopkeeper'], 
+                        'Guard': ['Captain', 'Veteran'],
+                        'Priest': ['Scholar', 'Counselor']
+                    };
+                    
+                    const related = relatedProfessions[npc.character.profession];
+                    if (related) {
+                        npc.character.profession = randomChoice(related);
+                        if (gameState.knownCharacters[npc.name]) {
+                            gameState.knownCharacters[npc.name].character.profession = npc.character.profession;
+                        }
+                    }
+                }
+            });
+
+            // --- NEW: Actually change population ---
+            // Remove an NPC (simulate moving away)
+            if (locations && locations.allNPCs && locations.allNPCs.length > 10 && Math.random() < 0.10) {
+                // Exclude player-known characters for now (optional: could be more nuanced)
+                const removable = locations.allNPCs.filter(npc => !gameState.talkedToToday.includes(npc.name));
+                if (removable.length > 0) {
+                    const npcToRemove = randomChoice(removable);
+                    // Remove from allNPCs
+                    locations.allNPCs = locations.allNPCs.filter(npc => npc !== npcToRemove);
+                    // Remove from location.npcs
+                    if (locations[npcToRemove.location] && locations[npcToRemove.location].npcs) {
+                        locations[npcToRemove.location].npcs = locations[npcToRemove.location].npcs.filter(npc => npc !== npcToRemove);
+                    }
+                    // Remove from knownCharacters if present
+                    if (gameState.knownCharacters[npcToRemove.name]) {
+                        delete gameState.knownCharacters[npcToRemove.name];
+                    }
+                }
+            }
+
+            // Add a new NPC (simulate new arrival)
+            if (locations && Math.random() < 0.10) {
+                // Pick a random location key (excluding metadata)
+                const locationKeys = Object.keys(locations).filter(key => !['townInfo', 'allNPCs'].includes(key));
+                if (locationKeys.length > 0) {
+                    const locationKey = randomChoice(locationKeys);
+                    // Determine correct character generation key
+                    let charGenKey = locationKey;
+                    if (locationKey === 'industrial') {
+                        charGenKey = getIndustrialMappingKey(locations.townInfo.type);
+                    } else if (locationKey === 'government') {
+                        charGenKey = 'mayor';
+                    }
+                    const name = generateCharacterName();
+                    const character = generateCharacter(charGenKey);
+                    // Assign generic info
+                    const info = {
+                        text: `${name} shares local gossip and personal observations about ${locations.townInfo.name}`,
+                        type: 'confirmed',
+                        source: name
+                    };
+                    const newNPC = {
+                        name,
+                        character,
+                        info,
+                        location: locationKey
+                    };
+                    // Add to allNPCs and location.npcs
+                    locations.allNPCs.push(newNPC);
+                    if (locations[locationKey] && locations[locationKey].npcs) {
+                        locations[locationKey].npcs.push(newNPC);
+                    }
+                    // Re-generate relationships for all NPCs
+                    generateCharacterRelationships(locations.allNPCs, locations.townInfo);
+                    // Generate dialogue for new NPC
+                    newNPC.dialogue = generateDialogue(newNPC.character, newNPC.info);
+                }
+            }
+
+            // Update UI if needed
+            if (typeof updateLocationsDisplay === 'function') {
+                updateLocationsDisplay();
+            }
+        }
+    };
 }
 
 function generateEventFromSeed(seed, townInfo, npcs, storyConsequences) {
@@ -1254,30 +1775,54 @@ function generateFictionInspiredEvent(seed, townInfo, npcs, storyConsequences) {
 }
 
 function generateTruthInspiredEvent(seed, townInfo, npcs, storyConsequences) {
-    return {
-        type: 'consequence',
-        title: 'Truth Sparks Action',
-        description: `Your truthful storytelling has motivated people to take practical action. Several townspeople have formed a committee to address the real issues you highlighted in your story.`,
-        characters: [],
-        effects: () => {
-            // Slightly improve town conditions
-            if (Math.random() < 0.5) {
-                gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight - 1);
-            }
-            
-            // Create a positive rumor about community action
-            if (gameState.townStoryState?.elements) {
-                gameState.townStoryState.elements.push({
-                    id: `action_rumor_${Date.now()}_${Math.random()}`,
-                    originalText: "The townspeople have organized to solve real problems facing the community",
-                    originalType: 'confirmed',
-                    currentType: 'confirmed',
-                    category: 'community_action',
-                    dayAdded: gameState.day,
-                    evolutionHistory: [`Day ${gameState.day}: Community action inspired by truthful storytelling`]
-                });
+    const truthEvents = [
+        {
+            title: 'Truth Sparks Action',
+            description: `Your truthful storytelling has motivated people to take practical action. Several townspeople have formed a committee to address the real issues you highlighted in your story.`,
+            effects: () => {
+                if (Math.random() < 0.5) {
+                    gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight - 1);
+                }
+                if (gameState.townStoryState?.elements) {
+                    gameState.townStoryState.elements.push({
+                        id: `action_rumor_${Date.now()}_${Math.random()}`,
+                        originalText: "The townspeople have organized to solve real problems facing the community",
+                        originalType: 'confirmed',
+                        currentType: 'confirmed',
+                        category: 'community_action',
+                        dayAdded: gameState.day,
+                        evolutionHistory: [`Day ${gameState.day}: Community action inspired by truthful storytelling`]
+                    });
+                }
             }
         },
+        {
+            title: 'The Bard\'s Commission',
+            description: `Impressed by your commitment to truth, several townspeople have pooled their resources to commission you for a special performance. They want you to tell the true story of their community\'s struggles and triumphs.`,
+            effects: () => {
+                // Create a high-paying special opportunity
+                if (!gameState.availableOpportunities) gameState.availableOpportunities = [];
+                gameState.availableOpportunities.push('High-paying commissioned performance (50+ gold)');
+            }
+        },
+        {
+            title: 'Reputation as Truth-Teller',
+            description: `Word of your honest storytelling has spread. People now come to you seeking advice and wanting to share their real stories. Your reputation as a truth-teller precedes you.`,
+            effects: () => {
+                // Improve relationship building speed
+                if (!gameState.storytellerBonuses) gameState.storytellerBonuses = {};
+                gameState.storytellerBonuses.truthTeller = true;
+            }
+        }
+    ];
+    
+    const event = randomChoice(truthEvents);
+    return {
+        type: 'consequence',
+        title: event.title,
+        description: event.description,
+        characters: [],
+        effects: event.effects,
         seed: seed
     };
 }
@@ -1288,11 +1833,352 @@ function generateRandomEvent(townInfo, npcs, storyConsequences) {
     return oldEvents.length > 0 ? oldEvents[0] : null;
 }
 
+// --- EVENT CONSEQUENCES FOR THE BARD ---
+// This system makes events directly matter to the player's success and survival
+
+function calculateEventConsequencesForBard(event) {
+    const consequences = {
+        goldChange: 0,
+        reputationChange: 0,
+        relationshipChanges: {},
+        newOpportunities: [],
+        storyMaterial: [],
+        warnings: [],
+        innCostChange: 0,
+        audienceChanges: {}
+    };
+    
+    // Story-inspired events have stronger consequences (both positive and negative)
+    // Natural world events have more subtle consequences for the bard
+    let multiplier = 1.0;
+    if (event.storyInspired) {
+        multiplier = 1.5; // Story events affect bard strongly
+    } else if (!event.seed) {
+        multiplier = 0.5; // Natural events affect bard more subtly
+    }
+    
+    if (event.type === 'character' && event.characters.length > 0) {
+        event.characters.forEach(characterName => {
+            // Character events affect relationships with the bard
+            if (gameState.knownCharacters[characterName]) {
+                const character = gameState.knownCharacters[characterName];
+                
+                if (event.title.includes('Embraces Change') || event.title.includes('Finds New Purpose')) {
+                    // Positive character growth - they're grateful to the bard
+                    consequences.relationshipChanges[characterName] = 'improved';
+                    consequences.goldChange += Math.floor(10 * multiplier); // Grateful tips
+                    consequences.reputationChange += 0.1 * multiplier;
+                    consequences.storyMaterial.push(`${characterName} credits your story with inspiring their life change`);
+                } else if (event.title.includes('Reaches Out')) {
+                    // Relationship healing - community sees bard as peacemaker
+                    consequences.reputationChange += 0.15 * multiplier;
+                    consequences.storyMaterial.push(`${characterName}'s reconciliation has become the talk of the town`);
+                }
+            }
+            
+            // Career changes affect economic dynamics
+            if (event.title.includes('Changes Career') || event.title.includes('Embraces Change')) {
+                const newProfession = extractProfessionFromDescription(event.description);
+                if (newProfession === 'Merchant' || newProfession === 'Doctor') {
+                    consequences.goldChange += Math.floor(15 * multiplier); // Wealthier professions
+                } else if (newProfession === 'Guard') {
+                    consequences.reputationChange += 0.1 * multiplier; // Safer town
+                } else if (newProfession === 'Priest') {
+                    consequences.reputationChange += 0.05 * multiplier; // Moral authority
+                    consequences.storyMaterial.push('Religious themes may resonate more strongly with this character');
+                }
+                
+                // Risk: Career changes can sometimes backfire
+                if (Math.random() < 0.15) { // 15% chance of negative consequence
+                    consequences.warnings.push(`${characterName}'s career change has caused some disruption in the community`);
+                    consequences.goldChange -= Math.floor(5 * multiplier);
+                }
+            }
+        });
+    }
+    
+    if (event.type === 'economic') {
+        // Economic events directly affect the bard's finances
+        if (event.title.includes('Trade Route') || event.title.includes('Business Venture')) {
+            consequences.goldChange += Math.floor(20 * multiplier); // Better economy = better tips
+            consequences.innCostChange = -Math.floor(1 * multiplier); // Cheaper costs
+            consequences.reputationChange += 0.2 * multiplier; // Credit for inspiring prosperity
+            consequences.storyMaterial.push('The new economic prosperity has everyone talking about opportunity');
+        } else if (event.title.includes('Market Day Success')) {
+            consequences.goldChange += Math.floor(10 * multiplier);
+            consequences.newOpportunities.push('Special market day performance opportunity');
+        } else if (event.title.includes('Resource Shortage')) {
+            consequences.goldChange -= Math.floor(5 * multiplier); // Harder times
+            consequences.innCostChange = Math.floor(1 * multiplier); // More expensive
+            consequences.warnings.push('Economic hardship may lead to fewer generous tips');
+        }
+    }
+    
+    if (event.type === 'mystery') {
+        // Mystery events create investigation opportunities and story material
+        consequences.newOpportunities.push('Investigation opportunity - people may pay for answers');
+        consequences.storyMaterial.push('A new mystery has captured everyone\'s imagination');
+        
+        if (event.title.includes('Old Mystery Solved')) {
+            consequences.goldChange += Math.floor(25 * multiplier); // Reward for solving mystery
+            consequences.reputationChange += 0.25 * multiplier; // Hero status
+            consequences.storyMaterial.push('Your storytelling helped solve a long-standing mystery');
+        } else if (event.title.includes('Life Imitates Art')) {
+            // Dangerous - people might think the bard has supernatural power
+            consequences.reputationChange += 0.3 * multiplier; // Fame
+            consequences.warnings.push('Some people are starting to think your stories have magical power');
+            
+            // Risk: If reputation gets too high from fictional stories, people might expect miracles
+            if (gameState.reputation === 'Great' || gameState.reputation === 'Legendary') {
+                consequences.warnings.push('Your reputation for supernatural storytelling may create unrealistic expectations');
+                consequences.goldChange -= Math.floor(5 * multiplier); // People expect free miracles
+            }
+        } else if (event.title.includes('Inspired Imagination')) {
+            consequences.reputationChange += 0.1 * multiplier;
+            consequences.storyMaterial.push('Children are reenacting your stories throughout the town');
+        }
+    }
+    
+    if (event.type === 'town' || event.type === 'social') {
+        // Town and social events affect community standing
+        if (event.title.includes('Community Comes Together') || event.title.includes('Celebration')) {
+            consequences.goldChange += Math.floor(15 * multiplier); // Community gratitude
+            consequences.reputationChange += 0.2 * multiplier;
+            consequences.newOpportunities.push('Special community performance opportunity');
+            consequences.storyMaterial.push('The whole community is in a celebratory mood');
+        } else if (event.title.includes('Changes at the')) {
+            // Location improvements
+            consequences.reputationChange += 0.1 * multiplier;
+            consequences.storyMaterial.push('Your story has brought positive attention to local establishments');
+        } else if (event.title.includes('Weather Pattern') || event.title.includes('Natural Cycles')) {
+            // Natural events create different story material
+            consequences.storyMaterial.push('Natural changes provide new material for seasonal storytelling');
+        } else if (event.title.includes('Community Dynamics') || event.title.includes('Generational Change')) {
+            // Social evolution creates ongoing story opportunities
+            consequences.storyMaterial.push('Evolving social dynamics offer rich material for future stories');
+        }
+    }
+    
+    // Handle natural world events differently than story-driven events
+    if (!event.seed && event.type !== 'consequence') {
+        // Natural events affect the bard as an observer, not a cause
+        if (event.title.includes('Personal Challenge') || event.title.includes('Personal Goal')) {
+            consequences.storyMaterial.push('Witnessing personal struggles gives you insight into human nature');
+        } else if (event.title.includes('Natural Discovery') || event.title.includes('Environmental Shift')) {
+            consequences.storyMaterial.push('Natural phenomena provide fascinating material for storytelling');
+            if (Math.random() < 0.3) {
+                consequences.newOpportunities.push('Nature-themed storytelling opportunity');
+            }
+        } else if (event.title.includes('Inn Licensing Tax')) {
+            consequences.goldChange -= Math.floor(5 * multiplier); // Inn costs hurt budget
+            consequences.warnings.push('New inn tax increases your daily expenses significantly');
+        } else if (event.title.includes('Performer Registration')) {
+            consequences.goldChange -= Math.floor(3 * multiplier); // Direct fee
+            consequences.warnings.push('New performer registration fees cut into your profits');
+        } else if (event.title.includes('Trade Route Security')) {
+            consequences.goldChange += Math.floor(3 * multiplier); // Wealthy traders tip more
+            consequences.innCostChange = 1; // But costs rise
+            consequences.storyMaterial.push('Security improvements create stories about safer travel');
+        } else if (event.title.includes('Currency Standardization')) {
+            // Variable effect based on the actual event consequences
+            consequences.storyMaterial.push('Currency changes provide material for stories about economic transformation');
+        } else if (event.title.includes('Curfew Enforcement')) {
+            consequences.goldChange -= Math.floor(8 * multiplier); // Smaller audiences
+            consequences.warnings.push('Curfews reduce your evening audience sizes');
+            consequences.storyMaterial.push('Curfew restrictions become a topic of concern in your stories');
+        } else if (event.title.includes('Vagrancy Prevention')) {
+            if (gameState.gold < 20) {
+                consequences.goldChange -= Math.floor(5 * multiplier); // Additional fee for poor bards
+                consequences.warnings.push('Low funds make you vulnerable to vagrancy charges');
+            } else {
+                consequences.storyMaterial.push('Having sufficient funds protects you from vagrancy laws');
+            }
+        } else if (event.title.includes('Content Review')) {
+            consequences.warnings.push('Content restrictions may limit your storytelling freedom');
+            consequences.storyMaterial.push('Censorship becomes a delicate topic requiring careful navigation');
+        } else if (event.title.includes('Crown Revenue Collection')) {
+            consequences.goldChange -= Math.floor(6 * multiplier); // Economic pressure reduces tips
+            consequences.warnings.push('Tax pressure on locals means less generous audiences for 3 days');
+        } else if (event.title.includes('Governance') || event.title.includes('Authority Decision')) {
+            consequences.storyMaterial.push('Political changes affect the stories people want to hear');
+        } else if (event.title.includes('Trade') || event.title.includes('Economic')) {
+            // Natural economic changes affect bard more subtly
+            consequences.goldChange += Math.floor(2 * multiplier); // Small economic benefit/cost
+            consequences.storyMaterial.push('Economic shifts change the audience\'s interests and concerns');
+        }
+    }
+    
+    if (event.type === 'consequence') {
+        // Direct story consequences have the strongest impact
+        if (event.title.includes('Truth Sparks Action')) {
+            consequences.goldChange += Math.floor(30 * multiplier); // Community reward
+            consequences.reputationChange += 0.3 * multiplier; // Respected truth-teller
+            consequences.storyMaterial.push('Your truthful storytelling has inspired real positive change');
+        } else if (event.title.includes('Story Inspires Action')) {
+            consequences.goldChange += Math.floor(20 * multiplier);
+            consequences.reputationChange += 0.2 * multiplier;
+        } else if (event.title.includes('Tale Spreads Through Town')) {
+            consequences.reputationChange += 0.15 * multiplier; // Fame
+            consequences.audienceChanges.size = Math.floor(2 * multiplier); // Bigger audiences
+        }
+    }
+    
+    return consequences;
+}
+
+function extractProfessionFromDescription(description) {
+    const professionMatches = description.match(/become a (\w+)/i);
+    return professionMatches ? professionMatches[1] : null;
+}
+
+function applyEventConsequencesToBard(consequences, eventTitle) {
+    let notificationMessages = [];
+    
+    // Apply gold changes
+    if (consequences.goldChange !== 0) {
+        gameState.gold += consequences.goldChange;
+        const goldText = consequences.goldChange > 0 ? `+${consequences.goldChange}` : `${consequences.goldChange}`;
+        notificationMessages.push(`💰 ${goldText} gold (${eventTitle})`);
+    }
+    
+    // Apply reputation changes
+    if (consequences.reputationChange !== 0) {
+        const oldRep = gameState.reputation;
+        updateReputation(consequences.reputationChange * 100); // Convert to existing scale
+        const newRep = gameState.reputation;
+        if (oldRep !== newRep) {
+            notificationMessages.push(`⭐ Reputation: ${oldRep} → ${newRep}`);
+        }
+    }
+    
+    // Apply inn cost changes
+    if (consequences.innCostChange !== 0) {
+        const oldCost = gameState.innCostPerNight;
+        gameState.innCostPerNight = Math.max(3, gameState.innCostPerNight + consequences.innCostChange);
+        const newCost = gameState.innCostPerNight;
+        if (oldCost !== newCost) {
+            const changeText = consequences.innCostChange > 0 ? 'increased' : 'decreased';
+            notificationMessages.push(`🏨 Inn costs ${changeText}: ${oldCost} → ${newCost} gold/night`);
+        }
+    }
+    
+    // Apply relationship changes
+    Object.keys(consequences.relationshipChanges).forEach(characterName => {
+        if (gameState.knownCharacters[characterName]) {
+            const character = gameState.knownCharacters[characterName];
+            const oldLevel = character.relationshipLevel;
+            
+            if (consequences.relationshipChanges[characterName] === 'improved') {
+                if (character.relationshipLevel === 'acquaintance') {
+                    character.relationshipLevel = 'friend';
+                } else if (character.relationshipLevel === 'friend') {
+                    character.relationshipLevel = 'confidant';
+                }
+                
+                if (oldLevel !== character.relationshipLevel) {
+                    notificationMessages.push(`👥 ${characterName}: ${oldLevel} → ${character.relationshipLevel}`);
+                }
+            }
+        }
+    });
+    
+    // Store opportunities and story material for later use
+    if (consequences.newOpportunities.length > 0) {
+        if (!gameState.availableOpportunities) gameState.availableOpportunities = [];
+        gameState.availableOpportunities.push(...consequences.newOpportunities);
+        notificationMessages.push(`✨ New opportunities: ${consequences.newOpportunities.length}`);
+    }
+    
+    if (consequences.storyMaterial.length > 0) {
+        if (!gameState.bardNotifications) gameState.bardNotifications = [];
+        gameState.bardNotifications.push(...consequences.storyMaterial);
+    }
+    
+    // Store warnings
+    if (consequences.warnings.length > 0) {
+        if (!gameState.bardWarnings) gameState.bardWarnings = [];
+        gameState.bardWarnings.push(...consequences.warnings);
+        notificationMessages.push(`⚠️ ${consequences.warnings.length} warning${consequences.warnings.length > 1 ? 's' : ''}`);
+    }
+    
+    // Store notifications for display to player
+    if (notificationMessages.length > 0) {
+        if (!gameState.pendingEventNotifications) gameState.pendingEventNotifications = [];
+        gameState.pendingEventNotifications.push({
+            eventTitle: eventTitle,
+            notifications: [...notificationMessages],
+            timestamp: new Date().toLocaleString()
+        });
+    }
+    
+    return notificationMessages;
+}
+
+function showEventNotifications() {
+    if (!gameState.pendingEventNotifications || gameState.pendingEventNotifications.length === 0) {
+        return;
+    }
+    
+    // Create modal to show event consequences
+    const notificationModal = document.createElement('div');
+    notificationModal.className = 'modal';
+    notificationModal.id = 'event-notification-modal';
+    notificationModal.style.display = 'block';
+    
+    let notificationHTML = `
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="closeEventNotifications()">&times;</span>
+            <h2 style="color: #daa520; text-align: center; margin-bottom: 20px;">📜 Morning Report: Events Affect You</h2>
+            <p style="color: #ccc; font-style: italic; text-align: center; margin-bottom: 20px;">
+                Your stories have shaped the world, and the world has noticed...
+            </p>
+    `;
+    
+    gameState.pendingEventNotifications.forEach(notification => {
+        notificationHTML += `
+            <div style="background: rgba(139, 69, 19, 0.3); border-left: 4px solid #daa520; padding: 15px; margin: 10px 0; border-radius: 0 8px 8px 0;">
+                <h4 style="color: #daa520; margin-bottom: 10px;">${notification.eventTitle}</h4>
+                <div style="margin-left: 10px;">
+                    ${notification.notifications.map(notif => `
+                        <div style="margin: 5px 0; color: #f4e4c1; font-size: 0.95em;">• ${notif}</div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    notificationHTML += `
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="closeEventNotifications()" style="padding: 12px 24px; font-size: 1.1em; background: linear-gradient(45deg, #654321 0%, #8b4513 100%);">
+                    Continue Your Journey
+                </button>
+            </div>
+        </div>
+    `;
+    
+    notificationModal.innerHTML = notificationHTML;
+    document.body.appendChild(notificationModal);
+    
+    // Clear the notifications after showing them
+    gameState.pendingEventNotifications = [];
+}
+
+function closeEventNotifications() {
+    const modal = document.getElementById('event-notification-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
 // Event Log System
 function addToEventLog(event) {
     if (!gameState.eventLog) {
         gameState.eventLog = [];
     }
+    
+    // Calculate and apply consequences for the bard
+    const consequences = calculateEventConsequencesForBard(event);
+    const notifications = applyEventConsequencesToBard(consequences, event.title);
     
     const logEntry = {
         id: `event_${Date.now()}_${Math.random()}`,
@@ -1305,7 +2191,9 @@ function addToEventLog(event) {
         characters: event.characters || [],
         timestamp: new Date().toLocaleString(),
         storyInspired: event.seed ? true : false,
-        seedReason: event.seed ? event.seed.reason : null
+        seedReason: event.seed ? event.seed.reason : null,
+        bardConsequences: consequences,
+        bardNotifications: notifications
     };
     
     gameState.eventLog.unshift(logEntry); // Add to beginning for reverse chronological order
@@ -1314,6 +2202,8 @@ function addToEventLog(event) {
     if (gameState.eventLog.length > 100) {
         gameState.eventLog = gameState.eventLog.slice(0, 100);
     }
+    
+    console.log(`Event "${event.title}" affected bard:`, notifications);
 }
 
 function updateEventLogDisplay(filter = 'all') {
@@ -1328,14 +2218,21 @@ function updateEventLogDisplay(filter = 'all') {
     
     if (filter === 'story-inspired') {
         filteredEvents = eventLog.filter(event => event.storyInspired);
+    } else if (filter === 'natural') {
+        filteredEvents = eventLog.filter(event => !event.storyInspired && !event.seedReason);
     } else if (filter !== 'all') {
         filteredEvents = eventLog.filter(event => event.type === filter);
     }
     
     if (filteredEvents.length === 0) {
-        const noEventsMessage = filter === 'story-inspired' 
-            ? 'No story-inspired events yet. Tell more stories and watch as your tales shape the world around you!'
-            : 'No events have been recorded yet. Begin your story and watch as the world comes alive around you!';
+        let noEventsMessage;
+        if (filter === 'story-inspired') {
+            noEventsMessage = 'No story-inspired events yet. Tell more stories and watch as your tales shape the world around you!';
+        } else if (filter === 'natural') {
+            noEventsMessage = 'No natural world events yet. These are events that happen organically as the world lives and breathes around you.';
+        } else {
+            noEventsMessage = 'No events have been recorded yet. Begin your story and watch as the world comes alive around you!';
+        }
         eventLogDisplay.innerHTML = `<p style="color: #999; font-style: italic; text-align: center; margin-top: 40px;">${noEventsMessage}</p>`;
         return;
     }
@@ -1386,6 +2283,14 @@ function updateEventLogDisplay(filter = 'all') {
                 ${event.characters.length > 0 ? `
                     <div class="event-characters" style="font-size: 0.8em; color: #daa520;">
                         👥 Characters involved: ${event.characters.join(', ')}
+                    </div>
+                ` : ''}
+                ${event.bardNotifications && event.bardNotifications.length > 0 ? `
+                    <div class="bard-consequences" style="background: rgba(218, 165, 32, 0.1); border: 1px solid #daa520; border-radius: 4px; padding: 8px; margin-top: 8px;">
+                        <div style="font-size: 0.8em; color: #daa520; font-weight: bold; margin-bottom: 5px;">📊 Effects on You:</div>
+                        ${event.bardNotifications.map(notif => `
+                            <div style="font-size: 0.8em; color: #f4e4c1; margin: 2px 0;">• ${notif}</div>
+                        `).join('')}
                     </div>
                 ` : ''}
             </div>
@@ -3528,6 +4433,54 @@ function updateUI() {
             
             console.log('Character card created for:', character.name);
             infoList.appendChild(charDiv);
+        });
+        infoList.innerHTML += '<br>';
+    }
+    
+    // Show opportunities unlocked by events
+    if (gameState.availableOpportunities && gameState.availableOpportunities.length > 0) {
+        infoList.innerHTML += '<h4 style="color: #32cd32; margin-bottom: 10px;">✨ Special Opportunities Available:</h4>';
+        gameState.availableOpportunities.forEach(opportunity => {
+            const oppDiv = document.createElement('div');
+            oppDiv.className = 'info-item';
+            oppDiv.style.borderLeft = '4px solid #32cd32';
+            oppDiv.innerHTML = `
+                <div style="color: #32cd32; font-weight: bold;">${opportunity}</div>
+                <div class="info-source" style="color: #90ee90;">Unlocked by your storytelling influence</div>
+            `;
+            infoList.appendChild(oppDiv);
+        });
+        infoList.innerHTML += '<br>';
+    }
+    
+    // Show warnings from events
+    if (gameState.bardWarnings && gameState.bardWarnings.length > 0) {
+        infoList.innerHTML += '<h4 style="color: #ffa500; margin-bottom: 10px;">⚠️ Warnings & Concerns:</h4>';
+        gameState.bardWarnings.slice(-3).forEach(warning => { // Show only last 3 warnings
+            const warnDiv = document.createElement('div');
+            warnDiv.className = 'info-item';
+            warnDiv.style.borderLeft = '4px solid #ffa500';
+            warnDiv.innerHTML = `
+                <div style="color: #ffa500;">${warning}</div>
+                <div class="info-source" style="color: #ffcccb;">Consider the consequences of your storytelling</div>
+            `;
+            infoList.appendChild(warnDiv);
+        });
+        infoList.innerHTML += '<br>';
+    }
+    
+    // Show positive story material from events
+    if (gameState.bardNotifications && gameState.bardNotifications.length > 0) {
+        infoList.innerHTML += '<h4 style="color: #6495ed; margin-bottom: 10px;">📚 Story Material from Your Impact:</h4>';
+        gameState.bardNotifications.slice(-3).forEach(material => { // Show only last 3 notifications
+            const matDiv = document.createElement('div');
+            matDiv.className = 'info-item';
+            matDiv.style.borderLeft = '4px solid #6495ed';
+            matDiv.innerHTML = `
+                <div style="color: #6495ed;">${material}</div>
+                <div class="info-source" style="color: #b0c4de;">New story inspiration from your influence</div>
+            `;
+            infoList.appendChild(matDiv);
         });
         infoList.innerHTML += '<br>';
     }
@@ -5904,46 +6857,87 @@ function tellStory() {
     // Create event seeds from this story for future events
     seedEventsFromStory(gameState.storyChoices);
     
+    // Hide evening phase and show results modal
     document.getElementById('evening-phase').classList.add('hidden');
-    document.getElementById('night-phase').classList.remove('hidden');
     gameState.currentPhase = 'night';
     
-    generatePerformanceResults();
+    showPerformanceResultsModal();
+}
+
+function showPerformanceResultsModal() {
+    // Generate performance data
+    const performanceData = generatePerformanceResults();
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'performance-results-modal';
+    modal.style.display = 'block';
+    
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 700px;">
+            <h2 style="color: #daa520; text-align: center; margin-bottom: 20px;">🌙 Performance Results</h2>
+            
+            <div style="background: rgba(255, 215, 0, 0.1); border: 2px solid #daa520; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #daa520; margin-bottom: 10px;">The Story You Told:</h3>
+                <div style="line-height: 1.4; font-size: 14px;">${performanceData.storyText}</div>
+            </div>
+            
+            <div style="background: rgba(139, 69, 19, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <h3 style="color: #daa520; margin-bottom: 10px;">Audience Reaction:</h3>
+                ${performanceData.reactions.map(reaction => 
+                    `<div class="reaction-item ${reaction.type}" style="margin: 5px 0; color: #f4e4c1;">${reaction.text}</div>`
+                ).join('')}
+            </div>
+            
+            <div style="background: rgba(139, 69, 19, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <h3 style="color: #daa520; margin-bottom: 10px;">Earnings:</h3>
+                ${Object.entries(performanceData.earnings).map(([source, amount]) => 
+                    `<div style="display: flex; justify-content: space-between; margin: 5px 0; color: #f4e4c1;">
+                        <span>${source}:</span><span>${amount >= 0 ? '+' : ''}${amount} gold</span>
+                    </div>`
+                ).join('')}
+            </div>
+            
+            <div style="background: rgba(139, 69, 19, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <h3 style="color: #daa520; margin-bottom: 10px;">Immediate Consequences:</h3>
+                ${performanceData.consequences.map(consequence => 
+                    `<div style="margin: 5px 0; color: #f4e4c1;">${consequence}</div>`
+                ).join('')}
+            </div>
+            
+            <div style="text-align: center;">
+                <button onclick="closePerformanceModal(); nextDay()" style="padding: 15px 30px; font-size: 1.1em; background: linear-gradient(45deg, #654321 0%, #8b4513 100%); color: #f4e4c1; border: none; border-radius: 8px; cursor: pointer;">
+                    🌅 Rest for the Night (${gameState.innCostPerNight} gold)
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function closePerformanceModal() {
+    const modal = document.getElementById('performance-results-modal');
+    if (modal) {
+        modal.remove();
+    }
+    // Make sure UI is updated after modal closes
+    updateUI();
 }
 
 function generatePerformanceResults() {
-    const audienceDiv = document.getElementById('audience-feedback');
-    const earningsDiv = document.getElementById('earnings-breakdown');
-    const consequencesDiv = document.getElementById('immediate-consequences');
-    
     // Generate the actual story text based on selected elements
     const storyText = generateStoryFromElements();
-    
-    // Display the story
-    const storyDisplay = document.getElementById('story-display');
-    if (storyDisplay) {
-        storyDisplay.innerHTML = `
-            <div style="background: rgba(255, 215, 0, 0.1); border: 2px solid #daa520; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <h3 style="color: #daa520; margin-bottom: 15px;">The Story You Told:</h3>
-                <div style="line-height: 1.6; font-size: 16px;">${storyText}</div>
-            </div>
-        `;
-    }
     
     // Calculate story effectiveness
     const storyEffectiveness = calculateStoryEffectiveness();
     
     // Generate audience reactions
     const reactions = generateAudienceReactions(storyEffectiveness);
-    audienceDiv.innerHTML = reactions.map(reaction => 
-        `<div class="reaction-item ${reaction.type}">${reaction.text}</div>`
-    ).join('');
     
     // Calculate earnings
     const earnings = calculateEarnings(storyEffectiveness);
-    earningsDiv.innerHTML = Object.entries(earnings).map(([source, amount]) => 
-        `<div class="earnings-item"><span>${source}:</span><span>${amount >= 0 ? '+' : ''}${amount} gold</span></div>`
-    ).join('');
     
     // Update gold (excluding inn cost for now - that happens when resting)
     const performanceEarnings = earnings['Base Performance Fee'] + earnings['Audience Tips'] + (earnings['Personal Bonuses'] || 0);
@@ -5951,9 +6945,6 @@ function generatePerformanceResults() {
     
     // Generate consequences
     const consequences = generateConsequences(storyEffectiveness);
-    consequencesDiv.innerHTML = consequences.map(consequence => 
-        `<div class="reaction-item">${consequence}</div>`
-    ).join('');
     
     // Store previous reputation for comparison
     const previousReputation = gameState.reputation;
@@ -5976,7 +6967,13 @@ function generatePerformanceResults() {
     // Check for low gold warning
     checkLowGoldWarning();
     
-    updateUI();
+    // Return all the data for the modal
+    return {
+        storyText: storyText,
+        reactions: reactions,
+        earnings: earnings,
+        consequences: consequences
+    };
 }
 
 function generateStoryFromElements() {
@@ -6370,52 +7367,27 @@ function isOpposingTone(preferredTone, storyTone) {
 function generateAudienceReactions(effectiveness) {
     const reactions = [];
     
-    // General crowd reaction based on overall effectiveness
-    if (effectiveness >= 80) {
-        reactions.push({ type: 'positive', text: 'The crowd erupts in applause! The tavern fills with cheers and stamping feet.' });
-    } else if (effectiveness >= 60) {
-        reactions.push({ type: 'positive', text: 'The audience listens intently, many nodding along with your tale.' });
+    // Simplified audience reactions
+    if (effectiveness >= 70) {
+        reactions.push({ type: 'positive', text: 'The audience approves of your story.' });
     } else if (effectiveness >= 40) {
-        reactions.push({ type: 'neutral', text: 'The crowd seems mildly entertained but not deeply moved.' });
+        reactions.push({ type: 'neutral', text: 'The audience has a neutral reaction to your story.' });
     } else {
-        reactions.push({ type: 'negative', text: 'Several people in the audience look bored or start quiet conversations.' });
+        reactions.push({ type: 'negative', text: 'The audience disapproves of your story.' });
     }
     
-    // Add specific individual reactions if available
+    // Add simplified individual reactions summary if available
     if (gameState.audienceReactions && gameState.audienceReactions.length > 0) {
-        reactions.push({ type: 'divider', text: '--- Individual Audience Reactions ---' });
+        const approvals = gameState.audienceReactions.filter(r => r.score >= 60).length;
+        const disapprovals = gameState.audienceReactions.filter(r => r.score < 40).length;
+        const neutral = gameState.audienceReactions.length - approvals - disapprovals;
         
-        gameState.audienceReactions.forEach(reaction => {
-            let reactionType = 'neutral';
-            let reactionText = '';
-            
-            if (reaction.score >= 80) {
-                reactionType = 'positive';
-                reactionText = `${reaction.name} applauds enthusiastically and calls for more`;
-            } else if (reaction.score >= 60) {
-                reactionType = 'positive'; 
-                reactionText = `${reaction.name} nods approvingly and smiles`;
-            } else if (reaction.score >= 40) {
-                reactionType = 'neutral';
-                reactionText = `${reaction.name} listens politely but seems distracted`;
-            } else if (reaction.score >= 25) {
-                reactionType = 'negative';
-                reactionText = `${reaction.name} frowns and shakes their head disapprovingly`;
-            } else if (reaction.score >= 10) {
-                reactionType = 'negative';
-                reactionText = `${reaction.name} scoffs audibly and looks annoyed`;
-            } else {
-                reactionType = 'negative';
-                reactionText = `${reaction.name} stands up angrily and storms toward the door`;
-            }
-            
-            // Add the main reason if available
-            if (reaction.reasons.length > 0) {
-                reactionText += ` - ${reaction.reasons[0]}`;
-            }
-            
-            reactions.push({ type: reactionType, text: reactionText });
-        });
+        if (approvals > 0 || disapprovals > 0 || neutral > 0) {
+            reactions.push({ 
+                type: 'summary', 
+                text: `Individual reactions: ${approvals} approve, ${neutral} neutral, ${disapprovals} disapprove` 
+            });
+        }
     }
     
     return reactions;
@@ -7688,6 +8660,11 @@ function nextDay() {
     gameState.eveningAudience = []; // Clear last night's audience
     gameState.audienceReactions = []; // Clear last night's reactions
     
+    // --- SHOW EVENT NOTIFICATIONS TO PLAYER ---
+    if (gameState.pendingEventNotifications && gameState.pendingEventNotifications.length > 0) {
+        showEventNotifications();
+    }
+    
     // --- EVOLVE STORY ELEMENTS AFTER NIGHTLY EVENTS ---
     if (locations && locations.townInfo) {
         evolveStoryElements(locations.townInfo.type);
@@ -7980,7 +8957,12 @@ function resetGame() {
         townEvents: [], // Array of events generated each night
         knownRumors: [], // Array of rumors the player has discovered
         eventLog: [], // Dwarf Fortress-style event log
-        eventSeeds: [] // Seeds created from stories that influence future events
+        eventSeeds: [], // Seeds created from stories that influence future events
+        // Bard consequence tracking
+        availableOpportunities: [], // Special opportunities unlocked by events
+        bardNotifications: [], // Positive story material and achievements
+        bardWarnings: [], // Warnings about potential negative consequences
+        pendingEventNotifications: [] // Notifications to show player about event impacts
     };
     
     // Generate new random characters for the fresh game
