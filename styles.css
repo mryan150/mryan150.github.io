@@ -426,6 +426,35 @@ button:disabled {
     color: #daa520;
 }
 
+/* Rumor Info */
+.rumor-info {
+    background: rgba(255, 215, 0, 0.08);
+    border: 1px solid #daa520;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 10px;
+    min-height: 60px;
+}
+
+.rumor-info h3 {
+    color: #daa520;
+    margin-bottom: 10px;
+}
+
+.rumor-item {
+    background: rgba(255, 215, 0, 0.15);
+    border-left: 4px solid #ffa500;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+}
+
+.rumor-item .rumor-source {
+    font-size: 0.8em;
+    color: #b8860b;
+    font-style: italic;
+}
+
 /* Footer */
 .game-footer {
     background: linear-gradient(45deg, #8b4513 0%, #a0522d 100%);
@@ -438,6 +467,42 @@ button:disabled {
 
 .objective {
     font-size: 1.1em;
+}
+
+/* Tab Bar */
+.tab-bar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: #2d1a07;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px 0;
+    background: none;
+    border: none;
+    color: #daa520;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    outline: none;
+}
+
+.tab-btn.active, .tab-btn:focus {
+    background: linear-gradient(45deg, #654321 0%, #8b4513 100%);
+    color: #fff8dc;
+}
+
+.tab-content {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
 }
 
 /* Responsive Design */
@@ -467,6 +532,61 @@ button:disabled {
         width: 95%;
         padding: 12px;
     }
+}
+
+@media (max-width: 600px) {
+    .game-main {
+        padding: 0 2px;
+    }
+    .tab-bar {
+        font-size: 0.95em;
+    }
+    .tab-btn {
+        padding: 10px 0;
+        font-size: 1em;
+    }
+    .tab-content {
+        padding: 0 2px;
+    }
+}
+
+/* Event Log Styles */
+.event-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.filter-btn {
+    background: rgba(139, 69, 19, 0.3);
+    border: 1px solid #8b4513;
+    color: #f4e4c1;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    background: rgba(139, 69, 19, 0.5);
+    border-color: #daa520;
+}
+
+.filter-btn.active {
+    background: rgba(218, 165, 32, 0.3);
+    border-color: #daa520;
+    color: #daa520;
+    font-weight: bold;
+}
+
+.event-log-entry {
+    transition: transform 0.2s ease;
+}
+
+.event-log-entry:hover {
+    transform: translateX(3px);
 }
 
 /* Utility Classes */
