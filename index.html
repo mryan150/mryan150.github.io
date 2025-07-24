@@ -27,86 +27,116 @@
         </header>
 
         <main class="game-main">
-            <!-- Day Phase -->
-            <div id="day-phase" class="phase">
-                <h2>☀️ Day Phase - Gather Information</h2>
-                <div class="town-info">
-                    <h3 id="town-name">Loading...</h3>
-                    <p id="town-description">Generating a unique town for your adventure...</p>
-                    <p style="font-size: 0.9em; color: #ffa500; font-style: italic;">💡 You can have up to 4 conversations per day. Choose wisely who you talk to!</p>
-                </div>
-                
-                <div class="locations" id="locations-container">
-                    <!-- Locations will be generated dynamically -->
-                </div>
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <button class="tab-btn" id="tab-phase-btn" onclick="showTab('phase')">Phase</button>
+                <button class="tab-btn" id="tab-info-btn" onclick="showTab('info')">Info</button>
+                <button class="tab-btn" id="tab-rumor-btn" onclick="showTab('rumor')">Rumors</button>
+                <button class="tab-btn" id="tab-events-btn" onclick="showTab('events')">Events</button>
+            </div>
 
+            <!-- Phase Tab Content -->
+            <div id="tab-phase" class="tab-content">
+                <!-- Day Phase -->
+                <div id="day-phase" class="phase">
+                    <h2>☀️ Day Phase - Gather Information</h2>
+                    <div class="town-info">
+                        <h3 id="town-name">Loading...</h3>
+                        <p id="town-description">Generating a unique town for your adventure...</p>
+                        <p style="font-size: 0.9em; color: #ffa500; font-style: italic;">💡 You can have up to 4 conversations per day. Choose wisely who you talk to!</p>
+                    </div>
+                    <div class="locations" id="locations-container"></div>
+                    <button id="evening-btn" onclick="startEvening()" disabled>🌙 Prepare for Evening Performance</button>
+                </div>
+                <!-- Evening Phase -->
+                <div id="evening-phase" class="phase hidden">
+                    <h2>🌙 Evening Phase - Craft Your Story</h2>
+                    <div id="audience-preview" class="audience-section"></div>
+                    <div class="story-crafting">
+                        <div class="act-section">
+                            <h3>Phase 1: Target Audience</h3>
+                            <p>Choose who you want to inspire with your story:</p>
+                            <div id="act1-choices" class="choices"></div>
+                            <div id="act1-selected" class="selected-choice"></div>
+                        </div>
+                        <div class="act-section">
+                            <h3>Phase 2: Setting</h3>
+                            <p>Choose where your story takes place:</p>
+                            <div id="act2-choices" class="choices"></div>
+                            <div id="act2-selected" class="selected-choice"></div>
+                        </div>
+                        <div class="act-section">
+                            <h3>Phase 3: Story Event</h3>
+                            <p>Choose what happens in your story:</p>
+                            <div id="act3-choices" class="choices"></div>
+                            <div id="act3-selected" class="selected-choice"></div>
+                        </div>
+                    </div>
+                    <div class="story-preview">
+                        <h3>Story Preview:</h3>
+                        <div id="story-preview-text"></div>
+                    </div>
+                    <button id="tell-story-btn" onclick="tellStory()" disabled>🎤 Tell Your Story</button>
+                </div>
+                <!-- Night Phase -->
+                <div id="night-phase" class="phase hidden">
+                    <h2>🌙 Performance Results</h2>
+                    <div id="story-display"></div>
+                    <div class="audience-reaction">
+                        <h3>Audience Reaction:</h3>
+                        <div id="audience-feedback"></div>
+                    </div>
+                    <div class="earnings">
+                        <h3>Earnings:</h3>
+                        <div id="earnings-breakdown"></div>
+                    </div>
+                    <div class="consequences">
+                        <h3>Immediate Consequences:</h3>
+                        <div id="immediate-consequences"></div>
+                    </div>
+                    <button onclick="nextDay()" id="rest-btn">🌅 Rest for the Night (5 gold)</button>
+                </div>
+            </div>
+
+            <!-- Info Tab Content -->
+            <div id="tab-info" class="tab-content" style="display:none;">
                 <div class="gathered-info">
                     <h3>Information Gathered:</h3>
                     <div id="information-list"></div>
                 </div>
-
-                <button id="evening-btn" onclick="startEvening()" disabled>🌙 Prepare for Evening Performance</button>
             </div>
 
-            <!-- Evening Phase -->
-            <div id="evening-phase" class="phase hidden">
-                <h2>🌙 Evening Phase - Craft Your Story</h2>
-                
-                <div id="audience-preview" class="audience-section">
-                    <!-- Audience will be populated dynamically -->
+            <!-- Rumor Tab Content -->
+            <div id="tab-rumor" class="tab-content" style="display:none;">
+                <div class="rumor-info">
+                    <h3>Rumors Heard:</h3>
+                    <div id="rumor-list"></div>
                 </div>
-                
-                <div class="story-crafting">
-                    <div class="act-section">
-                        <h3>Act I: The Setup</h3>
-                        <p>Choose your setting and initial situation:</p>
-                        <div id="act1-choices" class="choices"></div>
-                        <div id="act1-selected" class="selected-choice"></div>
-                    </div>
-
-                    <div class="act-section">
-                        <h3>Act II: The Conflict</h3>
-                        <p>Choose how the adventure unfolds:</p>
-                        <div id="act2-choices" class="choices"></div>
-                        <div id="act2-selected" class="selected-choice"></div>
-                    </div>
-
-                    <div class="act-section">
-                        <h3>Act III: The Resolution</h3>
-                        <p>Choose how your story ends:</p>
-                        <div id="act3-choices" class="choices"></div>
-                        <div id="act3-selected" class="selected-choice"></div>
-                    </div>
-                </div>
-
-                <div class="story-preview">
-                    <h3>Story Preview:</h3>
-                    <div id="story-preview-text"></div>
-                </div>
-
-                <button id="tell-story-btn" onclick="tellStory()" disabled>🎤 Tell Your Story</button>
             </div>
 
-            <!-- Night Phase -->
-            <div id="night-phase" class="phase hidden">
-                <h2>🌙 Performance Results</h2>
-                
-                <div class="audience-reaction">
-                    <h3>Audience Reaction:</h3>
-                    <div id="audience-feedback"></div>
+            <!-- Events Tab Content -->
+            <div id="tab-events" class="tab-content" style="display:none;">
+                <div class="events-info">
+                    <h3>📜 Event Chronicle</h3>
+                    <p style="color: #ccc; font-style: italic; font-size: 0.9em; margin-bottom: 15px;">
+                        A record of all events that have occurred during your travels, like the legends of Dwarf Fortress.
+                    </p>
+                    <div class="event-filters" style="margin-bottom: 15px;">
+                        <button class="filter-btn active" onclick="filterEvents('all')" data-filter="all">All Events</button>
+                        <button class="filter-btn" onclick="filterEvents('character')" data-filter="character">👤 Character</button>
+                        <button class="filter-btn" onclick="filterEvents('town')" data-filter="town">🏘️ Town</button>
+                        <button class="filter-btn" onclick="filterEvents('mystery')" data-filter="mystery">🔍 Mystery</button>
+                        <button class="filter-btn" onclick="filterEvents('consequence')" data-filter="consequence">📚 Story</button>
+                        <button class="filter-btn" onclick="filterEvents('economic')" data-filter="economic">💰 Economic</button>
+                        <button class="filter-btn" onclick="filterEvents('story-inspired')" data-filter="story-inspired">✨ Story-Inspired</button>
+                    </div>
+                    <div id="current-seeds-display" style="background: rgba(255, 99, 71, 0.1); border: 1px solid #ff6347; border-radius: 5px; padding: 10px; margin-bottom: 15px; display: none;">
+                        <h4 style="color: #ff6347; margin-bottom: 8px;">🌱 Active Story Seeds</h4>
+                        <p style="font-size: 0.85em; color: #ccc; margin-bottom: 8px;">These are influences from your recent stories that may shape future events:</p>
+                        <div id="seeds-list"></div>
+                    </div>
+                    <div id="event-log-display"></div>
                 </div>
-
-                <div class="earnings">
-                    <h3>Earnings:</h3>
-                    <div id="earnings-breakdown"></div>
-                </div>
-
-                <div class="consequences">
-                    <h3>Immediate Consequences:</h3>
-                    <div id="immediate-consequences"></div>
-                </div>
-
-                <button onclick="nextDay()" id="rest-btn">🌅 Rest for the Night (5 gold)</button>
             </div>
 
             <!-- Location Visit Modal -->
