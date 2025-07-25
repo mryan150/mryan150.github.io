@@ -125,13 +125,12 @@ function renderBardStats() {
         statsDiv.style.verticalAlign = 'middle';
         statsContainer.appendChild(statsDiv);
     }
-    statsDiv.innerHTML = `
-        <span style="color:#ffe4b5; font-weight:bold;">🎵 Bard Skill:</span>
-        <span style="color:#32cd32;">Real:</span> ${gameState.bardStats.real} &nbsp; 
-        <span style="color:#ffa500;">Rumor:</span> ${gameState.bardStats.rumor} &nbsp; 
-        <span style="color:#8ec6f8;">Made Up:</span> ${gameState.bardStats.madeUp}
-        <span style="font-size:0.9em; color:#ccc; margin-left:8px;">(Higher skill = better at winning over skeptics)</span>
-    `;
+            statsDiv.innerHTML = `
+            <span style="color:#ffe4b5; font-weight:bold;">🎵 Bard Skill:</span>
+            <span style="color:#32cd32;">Real:</span> ${gameState.bardStats.real}
+            <span style="color:#ffa500;">Rumor:</span> ${gameState.bardStats.rumor}
+            <span style="color:#8ec6f8;">Made Up:</span> ${gameState.bardStats.madeUp}
+        `;
 }
 // --- CHARACTER-LOCATION COMPATIBILITY SYSTEM ---
 const locationCompatibility = {
@@ -6234,7 +6233,8 @@ function getGenericCharacterForLocation(locationName) {
         'Docks': 'a seasoned sailor',
         'Lighthouse': 'a lighthouse keeper',
         'Graveyard': 'a mournful caretaker',
-        'School': 'a dedicated teacher'
+        'School': 'a dedicated teacher',
+        'Tavern Cook': 'a skilled cook'
     };
     
     return locationCharacters[locationName] || 'a brave soul';
@@ -9084,8 +9084,10 @@ function loadInstructionsContent() {
                     <li><strong>Visit Locations:</strong> Click on taverns, markets, stores, and government buildings</li>
                     <li><strong>Talk to NPCs:</strong> You have 4 conversations per day - choose wisely!</li>
                     <li><strong>Gather Information:</strong> Learn <em>confirmed facts</em>, <em>mysterious rumors</em>, or collect gossip</li>
+                    <li><strong>NPC Details:</strong> You can always see each NPC's profession, age, and traits in the location panel</li>
                     <li><strong>Build Relationships:</strong> Talking to the same people improves your relationship (acquaintance → friend → confidant)</li>
                     <li><strong>Shop for Supplies:</strong> Visit the 🛒 store to buy provisions, bodyguards, and travel equipment</li>
+                    <li><strong>Dynamic Town:</strong> The town population changes naturally—sometimes new NPCs arrive, sometimes people leave, and relationships are regenerated to reflect the new social web</li>
                 </ul>
             </section>
 
@@ -9107,6 +9109,14 @@ function loadInstructionsContent() {
             </section>
 
             <section style="margin-bottom: 25px;">
+                <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🎵 Bard Skill</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Bard Skill Types:</strong> Real, Rumor, and Made Up. Each time you tell a story of a type, your skill in that type increases.</li>
+                    <li><strong>Skill Effects:</strong> Higher skill makes it easier to win over skeptical audience members for that story type.</li>
+                </ul>
+            </section>
+
+            <section style="margin-bottom: 25px;">
                 <h3 style="color: #daa520; border-bottom: 2px solid #8b4513; padding-bottom: 8px;">🎭 Performance & Reputation</h3>
                 <div style="background: rgba(139, 69, 19, 0.2); padding: 15px; border-radius: 8px; margin: 10px 0;">
                     <p><strong>Patron Reactions:</strong></p>
@@ -9118,7 +9128,6 @@ function loadInstructionsContent() {
                         <li>🤬 <strong>Hate your story:</strong> Storm out angrily, spread bad word</li>
                     </ul>
                 </div>
-                
                 <p><strong>Reputation Levels:</strong> Terrible → Poor → Neutral → Decent → Good → Great → Legendary</p>
                 <p style="color: #ffa500;"><strong>Reputation affects:</strong> Store prices, patron patience, and whether you get chased out!</p>
             </section>
@@ -9132,7 +9141,6 @@ function loadInstructionsContent() {
                         <li><strong>Poor Reputation:</strong> Mayor asks you to leave after 5 days</li>
                     </ul>
                 </div>
-                
                 <p><strong>Oregon Trail-Style Travel:</strong></p>
                 <ul style="margin: 10px 0; padding-left: 20px;">
                     <li><strong>Choose Your Pace:</strong> Slow (safe), Normal (balanced), Fast (risky)</li>
@@ -9163,6 +9171,7 @@ function loadInstructionsContent() {
                     <li><strong>Plan Ahead:</strong> Buy supplies before your reputation gets too low</li>
                     <li><strong>Balance Risk:</strong> Made-up stories can create amazing reactions or terrible disasters</li>
                     <li><strong>Save Money:</strong> You need ${gameState.retirementGoal.toLocaleString()} gold, but also funds for daily expenses and travel (aim for 12-20 successful performances)</li>
+                    <li><strong>Tavern Cooks:</strong> Tavern Cooks are now properly part of the Tavern and may be found there.</li>
                 </ul>
             </section>
         </div>
