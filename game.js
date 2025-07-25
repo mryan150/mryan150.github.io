@@ -2397,6 +2397,290 @@ const townGen = {
             suffixes: ['bay', 'cove', 'harbor', 'shore', 'point', 'reef'],
             specialties: ['Fishing village by the sea', 'Important port for sea trade', 'Coastal town with maritime traditions'],
             atmospheres: ['Salty air and seabird cries', 'Weather-beaten but resilient', 'Connected to the rhythms of the tide']
+        },
+        tavern: {
+            adventure: {
+                confirmed: [
+                    `[PROTAGONIST] sets out to unite the tavern's patrons for a common cause.`,
+                    `A legendary drinking contest is organized by [PROTAGONIST] to lift spirits and uncover secrets.`,
+                    `[SUPPORTING_CHAR] and [PROTAGONIST] plan a night of music and tales to heal old wounds.`,
+                    `A mysterious stranger challenges [PROTAGONIST] to a game of riddles.`,
+                    `[PROTAGONIST] leads a midnight rescue when a regular goes missing.`
+                ],
+                rumored: [
+                    `Whispers of a ghost haunting the tavern draw [PROTAGONIST] into a night of investigation.`,
+                    `A secret passage is rumored to exist beneath the tavern, and [PROTAGONIST] seeks it out.`,
+                    `A series of strange dreams shared by patrons leads [PROTAGONIST] to search for their meaning.`,
+                    `A cursed cask is said to bring bad luck to whoever drinks from it.`,
+                    `A shadowy figure is seen slipping notes to the bard during performances.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] discovers the tavern is a crossroads for magical travelers.`,
+                    `A talking dog offers [PROTAGONIST] a quest to find the lost song of the ages.`,
+                    `The tavern transforms into a floating inn for one enchanted night.`,
+                    `A magical brew grants visions of the future to all who partake.`,
+                    `A portal opens in the fireplace, leading to a realm of endless revelry.`
+                ]
+            },
+            discovery: {
+                confirmed: [
+                    `[PROTAGONIST] uncovers the true story behind the tavern's founding.`,
+                    `A hidden diary reveals the secret love affair of two regulars.`,
+                    `[SUPPORTING_CHAR] helps [PROTAGONIST] piece together clues from old bar tabs.`,
+                    `A forgotten songbook is found, containing the town's lost anthem.`,
+                    `A regular confesses to a long-held secret that changes everything.`
+                ],
+                rumored: [
+                    `A mysterious map is found carved into a table.`,
+                    `Rumors of a hidden treasure beneath the tavern circulate among the patrons.`,
+                    `A ghostly voice is heard singing at closing time.`,
+                    `A series of coded messages is discovered in the tavern's chalkboard menus.`,
+                    `A patron claims to have seen the tavern move to a new location overnight.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] finds a magical mug that never empties.`,
+                    `A song sung backwards reveals a hidden prophecy.`,
+                    `A faerie queen visits the tavern in disguise.`,
+                    `A game of cards with a wizard changes the fate of the town.`,
+                    `A riddle contest with a sphinx brings wisdom and chaos.`
+                ]
+            },
+            conflict: {
+                confirmed: [
+                    `A brawl erupts between rival factions, and only [PROTAGONIST] can restore peace.`,
+                    `A cheating scandal threatens to tear the tavern community apart.`,
+                    `[ANTAGONIST] tries to turn the regulars against [PROTAGONIST].`,
+                    `A long-standing feud comes to a head over a spilled drink.`,
+                    `A new owner threatens to change everything the patrons love.`
+                ],
+                rumored: [
+                    `Rumors of poison in the ale spark panic.`,
+                    `A masked figure is seen sabotaging the entertainment.`,
+                    `A secret society meets in the tavern's back room.`,
+                    `A series of pranks escalates into open conflict.`,
+                    `A rival bard challenges [PROTAGONIST] to a duel of songs.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] faces a band of ghostly pirates who want their favorite table back.`,
+                    `A magical storm traps everyone inside until a riddle is solved.`,
+                    `A contest of magical drinks leads to wild transformations.`,
+                    `A living painting leaps from the wall to challenge [PROTAGONIST].`,
+                    `A time loop forces the tavern to relive the same night until peace is made.`
+                ]
+            }
+        },
+        government: {
+            adventure: {
+                confirmed: [
+                    `[PROTAGONIST] is recruited to solve a crisis in the town council.`,
+                    `A daring heist is planned to recover stolen documents.`,
+                    `[SUPPORTING_CHAR] and [PROTAGONIST] work to expose corruption.`,
+                    `A diplomatic envoy arrives, and [PROTAGONIST] must broker peace.`,
+                    `A mysterious law is discovered that could change everything.`
+                ],
+                rumored: [
+                    `Rumors of a coup reach [PROTAGONIST], who must act quickly.`,
+                    `A secret passage is said to connect the council chamber to the tavern.`,
+                    `A coded letter hints at a plot against the mayor.`,
+                    `A shadowy advisor is pulling strings behind the scenes.`,
+                    `A prophecy foretells the rise of a new leader.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] is visited by a spirit of governance, offering cryptic advice.`,
+                    `A magical contract binds the council to ancient rules.`,
+                    `A talking statue gives legal advice to all who ask.`,
+                    `A council meeting is interrupted by a rain of frogs.`,
+                    `A portal opens to a realm where laws are living beings.`
+                ]
+            },
+            discovery: {
+                confirmed: [
+                    `[PROTAGONIST] uncovers evidence of embezzlement.`,
+                    `A hidden archive reveals the town's true history.`,
+                    `[SUPPORTING_CHAR] helps [PROTAGONIST] decode old council minutes.`,
+                    `A whistleblower comes forward with vital information.`,
+                    `A forgotten law is found that saves the town from disaster.`
+                ],
+                rumored: [
+                    `A mysterious ledger is found with strange entries.`,
+                    `Rumors of a secret society within the council abound.`,
+                    `A ghostly figure is seen in the council chamber at night.`,
+                    `A series of anonymous notes warns of impending danger.`,
+                    `A councilor is rumored to be a shapeshifter.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] finds a magical quill that writes the future.`,
+                    `A debate with a demon lawyer changes the town's fate.`,
+                    `A council meeting is held in a dream.`,
+                    `A magical census reveals everyone's secret wishes.`,
+                    `A law is passed that makes everyone sing for a day.`
+                ]
+            },
+            conflict: {
+                confirmed: [
+                    `A power struggle erupts between council factions.`,
+                    `A vote of no confidence threatens the mayor.`,
+                    `[ANTAGONIST] tries to seize control of the council.`,
+                    `A heated debate turns into a shouting match.`,
+                    `A scandal rocks the government to its core.`
+                ],
+                rumored: [
+                    `Rumors of bribery and blackmail swirl.`,
+                    `A masked figure is seen tampering with ballots.`,
+                    `A secret trial is held in the dead of night.`,
+                    `A rival town tries to influence the council's decisions.`,
+                    `A magical curse is said to affect all councilors.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] faces a council of ghosts who demand justice.`,
+                    `A magical duel decides the fate of the town's laws.`,
+                    `A living law book argues with the council.`,
+                    `A time paradox threatens to undo all legislation.`,
+                    `A councilor is revealed to be an ancient dragon in disguise.`
+                ]
+            }
+        },
+        coastal: {
+            adventure: {
+                confirmed: [
+                    `[PROTAGONIST] leads a rescue mission after a shipwreck.`,
+                    `A storm threatens the harbor, and [PROTAGONIST] must rally the townsfolk.`,
+                    `[SUPPORTING_CHAR] and [PROTAGONIST] organize a regatta to boost morale.`,
+                    `A mysterious island appears off the coast, and [PROTAGONIST] sets sail to explore it.`,
+                    `A legendary sea monster is rumored to be nearby.`
+                ],
+                rumored: [
+                    `Whispers of a ghost ship reach the docks.`,
+                    `A message in a bottle hints at buried treasure.`,
+                    `A mermaid is seen singing at dawn.`,
+                    `A strange fog brings odd happenings to the shore.`,
+                    `A sailor claims to have seen a city beneath the waves.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] discovers a portal to an underwater kingdom.`,
+                    `A talking dolphin offers guidance on the tides.`,
+                    `A magical storm sweeps the town into another world.`,
+                    `A sea witch grants wishes for a price.`,
+                    `A festival of lights attracts visitors from the spirit realm.`
+                ]
+            },
+            discovery: {
+                confirmed: [
+                    `[PROTAGONIST] uncovers the truth behind a series of shipwrecks.`,
+                    `A hidden cove is found, filled with lost cargo.`,
+                    `[SUPPORTING_CHAR] helps [PROTAGONIST] decode an old sailor's journal.`,
+                    `A lighthouse keeper reveals a long-held secret.`,
+                    `A map is found that changes the town's understanding of the coast.`
+                ],
+                rumored: [
+                    `A mysterious current is said to pull ships off course.`,
+                    `Rumors of a sunken city abound.`,
+                    `A ghostly crew is seen rowing ashore at midnight.`,
+                    `A series of strange lights is spotted beneath the waves.`,
+                    `A fisherman claims to have caught a talking fish.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] finds a shell that lets them speak to sea creatures.`,
+                    `A magical pearl reveals visions of the past.`,
+                    `A kraken rises to demand tribute.`,
+                    `A ship sails into the sky, taking the town's hopes with it.`,
+                    `A storm of singing fish brings joy and confusion.`
+                ]
+            },
+            conflict: {
+                confirmed: [
+                    `A feud erupts between fishermen and merchants.`,
+                    `A pirate raid threatens the town's safety.`,
+                    `[ANTAGONIST] tries to seize control of the docks.`,
+                    `A dispute over salvage rights divides the community.`,
+                    `A blockade threatens to cut off vital supplies.`
+                ],
+                rumored: [
+                    `Rumors of sabotage on the docks spread.`,
+                    `A masked figure is seen tampering with nets.`,
+                    `A secret smuggling ring is uncovered.`,
+                    `A rival town is blamed for missing cargo.`,
+                    `A curse is said to haunt the lighthouse.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] faces a sea serpent summoned by a rival.`,
+                    `A magical whirlpool threatens to swallow the harbor.`,
+                    `A contest of sea shanties determines the town's fate.`,
+                    `A living wave challenges [PROTAGONIST] to a riddle contest.`,
+                    `A time loop traps the town in an endless storm.`
+                ]
+            }
+        },
+        agricultural: {
+            adventure: {
+                confirmed: [
+                    `[PROTAGONIST] leads the planting of a new crop to save the town.`,
+                    `A drought threatens the fields, and [PROTAGONIST] seeks a solution.`,
+                    `[SUPPORTING_CHAR] and [PROTAGONIST] organize a harvest festival.`,
+                    `A mysterious animal is seen in the orchards.`,
+                    `A legendary seed is rumored to bring prosperity.`
+                ],
+                rumored: [
+                    `Whispers of a blight spread among the farmers.`,
+                    `A scarecrow is said to come to life at night.`,
+                    `A hidden spring is rumored to cure any crop.`,
+                    `A farmer claims to have seen a fairy ring in the fields.`,
+                    `A series of crop circles appears overnight.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] discovers a talking tree with ancient wisdom.`,
+                    `A magical rain brings a bumper harvest.`,
+                    `A contest of enchanted vegetables is held.`,
+                    `A living scarecrow asks for help to break its curse.`,
+                    `A portal opens to a land of endless summer.`
+                ]
+            },
+            discovery: {
+                confirmed: [
+                    `[PROTAGONIST] uncovers the cause of a mysterious crop failure.`,
+                    `A hidden root cellar is found, filled with ancient seeds.`,
+                    `[SUPPORTING_CHAR] helps [PROTAGONIST] analyze soil samples.`,
+                    `A wise elder shares forgotten farming techniques.`,
+                    `A map is found that reveals lost irrigation channels.`
+                ],
+                rumored: [
+                    `A mysterious fungus is said to spread at night.`,
+                    `Rumors of a golden apple circulate.`,
+                    `A ghostly plowman is seen working the fields.`,
+                    `A series of strange footprints is found in the mud.`,
+                    `A farmer claims to have spoken with a spirit of the land.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] finds a seed that grows into a beanstalk reaching the clouds.`,
+                    `A magical scarecrow protects the fields from harm.`,
+                    `A rain of flowers transforms the countryside.`,
+                    `A contest of magical livestock is held.`,
+                    `A living pumpkin offers advice on the harvest.`
+                ]
+            },
+            conflict: {
+                confirmed: [
+                    `A dispute over water rights divides the farmers.`,
+                    `A plague of locusts threatens the crops.`,
+                    `[ANTAGONIST] tries to seize control of the granary.`,
+                    `A feud erupts between neighboring villages.`,
+                    `A new tax on produce sparks outrage.`
+                ],
+                rumored: [
+                    `Rumors of sabotage in the fields spread.`,
+                    `A masked figure is seen poisoning the well.`,
+                    `A secret society of farmers is uncovered.`,
+                    `A rival town is blamed for a failed harvest.`,
+                    `A curse is said to haunt the old mill.`
+                ],
+                madeUp: [
+                    `[PROTAGONIST] faces a giant mole tunneling beneath the fields.`,
+                    `A magical drought tests the town's resolve.`,
+                    `A contest of enchanted plows determines the future of the harvest.`,
+                    `A living cloud bargains for rain.`,
+                    `A time loop traps the town in an endless planting season.`
+                ]
+            }
         }
     },
     locationTypes: {
@@ -4259,25 +4543,19 @@ const storyTemplates = {
     },
     act2: {
         adventure: {
-            confirmed: "With courage born of desperation and hope kindled by memory, [PROTAGONIST] sets forth into the unknown, seeking what was lost...",
-            rumored: "Heeding the cryptic counsel of [SUPPORTING_CHAR], [PROTAGONIST] dares to walk paths shrouded in whisper and shadow...",
-            madeUp: "Awakened to powers beyond mortal ken, [PROTAGONIST] strides forth as champion of the mystical realm, where impossibility bows to will...",
-            chase: "A desperate chase ensues, with [PROTAGONIST] pursued by unseen foes through twisting alleys and shadowed woods...",
-            rescue: "A daring rescue is mounted, as [PROTAGONIST] risks all to save [SUPPORTING_CHAR] from peril..."
+            confirmed: "Seeing the industrial troubles plaguing the community, [PROTAGONIST] decides to take action and venture forth to find a real solution...",
+            rumored: "Following mysterious clues and strange whispers, [PROTAGONIST] begins investigating the rumors [SUPPORTING_CHAR] had spoken about...",
+            madeUp: "Awakening to newfound magical abilities, [PROTAGONIST] discovers they have special powers to confront these otherworldly challenges..."
         },
         discovery: {
-            confirmed: "Through patient toil and careful observation, [PROTAGONIST] and [SUPPORTING_CHAR] piece together fragments of a larger truth...",
-            rumored: "Following threads of rumor and signs half-glimpsed, [PROTAGONIST] unearths secrets that may reshape everything...",
-            madeUp: "In a moment of divine revelation, the veil between worlds parts for [PROTAGONIST], revealing wonders beyond imagination...",
-            betrayal: "A shocking betrayal is revealed, forcing [PROTAGONIST] to question all they thought they knew...",
-            puzzle: "A cryptic puzzle must be solved, with the fate of many hanging in the balance..."
+            confirmed: "Through careful investigation of the industrial situation, [PROTAGONIST] and [SUPPORTING_CHAR] work together to uncover the truth...",
+            rumored: "Following cryptic leads and shadowy hints, [PROTAGONIST] makes a discovery that could change everything about the situation...",
+            madeUp: "Using mystical insights and arcane knowledge, [PROTAGONIST] unveils hidden secrets in spectacular fashion..."
         },
         conflict: {
-            confirmed: "Now [PROTAGONIST] stands against the tide of resistance, as [ANTAGONIST] marshals all who fear the coming change...",
-            rumored: "From the shadows emerges [ANTAGONIST], weaving conspiracies to ensnare [PROTAGONIST] in a web of doubt and danger...",
-            madeUp: "The very heavens tremble as [PROTAGONIST] faces the dark sorcery of [ANTAGONIST], in a clash that will echo through eternity!",
-            duel: "A fateful duel is fought, with honor, pride, and the future at stake...",
-            naturalDisaster: "A sudden natural disaster strikes, forcing friend and foe alike to unite or perish..."
+            confirmed: "The industrial problems inevitably lead [PROTAGONIST] to face real opposition from [ANTAGONIST] and the established order...",
+            rumored: "Dark forces connected to the industrial mysteries seem to conspire against [PROTAGONIST] who seeks the truth...",
+            madeUp: "Epic battles emerge as [PROTAGONIST] fights the dark powers that [ANTAGONIST] has unleashed from the cursed industrial sites..."
         }
     },
     act3: {
@@ -6320,86 +6598,442 @@ function generateAct2Text(act1Choice, act2Theme, type, characters) {
     const supportName = supportingChar ? supportingChar.name : 'a trusted ally';
     const antName = antagonist ? antagonist.name : 'a formidable opponent';
     
+    // Helper for random choice
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    
     // Create contextual Act 2 based on Act 1 theme and Act 2 direction
     const contextualTemplates = {
-        // If Act 1 was about industrial problems...
         industrial: {
             adventure: {
-                confirmed: `Seeing the industrial troubles plaguing the community, ${protName} decides to take action and venture forth to find a real solution...`,
-                rumored: `Following mysterious clues and strange whispers, ${protName} begins investigating the rumors ${supportName} had spoken about...`,
-                madeUp: `Awakening to newfound magical abilities, ${protName} discovers they have special powers to confront these otherworldly challenges...`
+                confirmed: [
+                    `Seeing the industrial troubles plaguing the community, ${protName} decides to take action and venture forth to find a real solution...`,
+                    `${protName} couldn't ignore the cries for help and set out to fix the failing machinery.`,
+                    `With the town's future at stake, ${protName} and ${supportName} devised a bold plan to restore the mines.`,
+                    `Determined to make a difference, ${protName} rallied the workers for a bold new project.`,
+                    `Rumors of a hidden resource inspired ${protName} to lead an expedition into the old tunnels.`
+                ],
+                rumored: [
+                    `Following mysterious clues and strange whispers, ${protName} begins investigating the rumors ${supportName} had spoken about...`,
+                    `${protName} heard tales of a secret passage and convinced ${supportName} to help explore it.`,
+                    `A cryptic message led ${protName} and ${supportName} deep into the heart of the factory.`,
+                    `The townsfolk spoke in hushed tones about a lost invention, and ${protName} was determined to find it.`,
+                    `A shadowy figure offered ${protName} a clue, setting off a chain of mysterious events.`
+                ],
+                madeUp: [
+                    `Awakening to newfound magical abilities, ${protName} discovers they have special powers to confront these otherworldly challenges...`,
+                    `A talking raven appeared to ${protName}, promising to reveal the secret of the endless steam.`,
+                    `With a flash of inspiration, ${protName} invented a fantastical machine that could change everything.`,
+                    `A dream guided ${protName} to a hidden chamber beneath the foundry, where magic and metal intertwined.`,
+                    `The spirits of the old miners whispered to ${protName}, urging a daring act of heroism.`
+                ]
             },
             discovery: {
-                confirmed: `Through careful investigation of the industrial situation, ${protName} and ${supportName} work together to uncover the truth...`,
-                rumored: `Following cryptic leads and shadowy hints, ${protName} makes a discovery that could change everything about the situation...`,
-                madeUp: `Using mystical insights and arcane knowledge, ${protName} unveils hidden secrets in spectacular fashion...`
+                confirmed: [
+                    `Through careful investigation of the industrial situation, ${protName} and ${supportName} work together to uncover the truth...`,
+                    `${protName} pored over old blueprints, hoping to find a forgotten solution.`,
+                    `A chance encounter with a retired engineer gave ${protName} a new perspective.`,
+                    `Together, ${protName} and ${supportName} discovered a flaw in the town's main engine.`,
+                    `A hidden journal revealed secrets about the factory's past.`
+                ],
+                rumored: [
+                    `Following cryptic leads and shadowy hints, ${protName} makes a discovery that could change everything about the situation...`,
+                    `A mysterious map led ${protName} to a sealed-off section of the plant.`,
+                    `Rumors of sabotage proved true when ${protName} found a tampered valve.`,
+                    `A coded letter from an unknown ally helped ${protName} piece together the puzzle.`,
+                    `A strange symbol kept appearing in the machinery, and ${protName} was determined to decode its meaning.`
+                ],
+                madeUp: [
+                    `Using mystical insights and arcane knowledge, ${protName} unveils hidden secrets in spectacular fashion...`,
+                    `A magical compass spun wildly, leading ${protName} to a secret underground workshop.`,
+                    `A vision showed ${protName} a future where machines and magic worked in harmony.`,
+                    `A talking mouse claimed to know the source of the factory's woes.`,
+                    `A riddle posed by a clockwork automaton set ${protName} on a path of discovery.`
+                ]
             },
             conflict: {
-                confirmed: `The industrial problems inevitably lead to ${protName} facing real opposition from ${antName} and the established order...`,
-                rumored: `Dark forces connected to the industrial mysteries seem to conspire against ${protName} who seeks the truth...`,
-                madeUp: `Epic battles emerge as ${protName} fights the dark powers that ${antName} has unleashed from the cursed industrial sites...`
+                confirmed: [
+                    `The industrial problems inevitably lead ${protName} to face real opposition from ${antName} and the established order...`,
+                    `${antName} tried to block every effort, but ${protName} refused to back down.`,
+                    `A heated argument erupted between ${protName} and ${antName} on the factory floor.`,
+                    `The workers were divided, with some siding with ${antName} against ${protName}.`,
+                    `A strike threatened to shut down the plant, and only ${protName}'s courage could resolve it.`
+                ],
+                rumored: [
+                    `Dark forces connected to the industrial mysteries seem to conspire against ${protName} who seeks the truth...`,
+                    `Whispers of betrayal spread, and ${antName} was always one step ahead.`,
+                    `A masked saboteur tried to stop ${protName} at every turn.`,
+                    `The townsfolk grew suspicious, and ${protName} had to clear their name.`,
+                    `A secret society opposed ${protName}'s investigation, led by the enigmatic ${antName}.`
+                ],
+                madeUp: [
+                    `Epic battles emerge as ${protName} fights the dark powers that ${antName} has unleashed from the cursed industrial sites...`,
+                    `A golem made of molten iron rose to challenge ${protName}.`,
+                    `${antName} summoned a storm of gears and steam to halt ${protName}'s progress.`,
+                    `The machinery itself seemed to come alive, attacking at ${antName}'s command.`,
+                    `A magical duel erupted between ${protName} and ${antName}, shaking the very foundations of the factory.`
+                ]
             }
         },
-        // If Act 1 was about market/economic issues...
         market: {
             adventure: {
-                confirmed: `Inspired by the economic struggles facing the community, ${protName} ventures out to find new opportunities for ${townInfo.name}...`,
-                rumored: `Driven by whispers and strange tales from the marketplace, ${protName} follows ${supportName}'s leads about hidden opportunities...`,
-                madeUp: `Blessed with mystical merchant powers, ${protName} sets forth to discover legendary trading routes of old...`
+                confirmed: [
+                    `${protName} embarks on a quest to revive the market's fortunes, seeking rare goods and new trade partners...`,
+                    `With ${supportName}'s help, ${protName} organizes a grand festival to attract merchants from afar.`,
+                    `Rumors of a lost treasure hidden beneath the stalls inspire ${protName} to dig deep—literally and figuratively.`,
+                    `${protName} challenges a rival merchant to a contest of wits and wares, hoping to restore the market's reputation.`,
+                    `A mysterious benefactor offers ${protName} a chance to turn the market's luck around.`
+                ],
+                rumored: [
+                    `Whispers of a secret society controlling the market reach ${protName}'s ears, prompting a covert investigation.`,
+                    `${protName} and ${supportName} follow a trail of coded messages hidden in market receipts.`,
+                    `A shadowy figure offers ${protName} a deal too good to be true—can it save the market?`,
+                    `Strange happenings at midnight draw ${protName} into the market's underbelly.`,
+                    `A series of thefts leads ${protName} to suspect a supernatural culprit.`
+                ],
+                madeUp: [
+                    `${protName} discovers a magical stall that sells dreams and memories, changing the market forever.`,
+                    `A talking cat offers ${protName} enchanted coins that multiply when spent wisely.`,
+                    `The market is visited by a caravan from another world, bringing wonders and chaos.`,
+                    `${protName} finds a map to a parallel bazaar where anything can be traded—even time.`,
+                    `A festival of illusions transforms the market into a place of endless possibility.`
+                ]
             },
             discovery: {
-                confirmed: `Through careful business investigation, ${protName} and ${supportName} work to understand what's really affecting trade...`,
-                rumored: `Following cryptic market rumors and coded messages, ${protName} discovers something that could transform commerce...`,
-                madeUp: `With supernatural business insight, ${protName} reveals ancient secrets of prosperity hidden in the stars...`
+                confirmed: [
+                    `${protName} uncovers a plot to fix prices and exposes the ringleaders.`,
+                    `A forgotten ledger reveals the market's true history, changing everything.`,
+                    `${supportName} helps ${protName} trace the source of counterfeit goods.`,
+                    `A hidden storeroom is found, filled with goods thought lost.`,
+                    `A retired merchant shares secrets that help ${protName} restore fair trade.`
+                ],
+                rumored: [
+                    `A coded message in a shipment leads ${protName} to a secret alliance.`,
+                    `Rumors of a cursed coin circulate, and ${protName} investigates its origin.`,
+                    `A mysterious buyer is influencing the market from the shadows.`,
+                    `A series of strange trades hints at a deeper conspiracy.`,
+                    `A ghostly merchant is said to haunt the market at night.`
+                ],
+                madeUp: [
+                    `${protName} discovers a portal to a market where wishes are the only currency.`,
+                    `A magical fruit stand appears, granting visions of the future.`,
+                    `A riddle contest with a genie changes the fate of the market.`,
+                    `A rain of gold coins causes chaos and opportunity.`,
+                    `A spell gone wrong turns all goods invisible until ${protName} finds the cure.`
+                ]
             },
             conflict: {
-                confirmed: `The market problems inevitably lead ${protName} to confront ${antName} who may be manipulating trade...`,
-                rumored: `Economic conspiracies seem to pit ${antName} against ${protName} in a battle for ${townInfo.name}'s future...`,
-                madeUp: `${protName} must battle the greed-demons that ${antName} has summoned to destroy commerce...`
+                confirmed: [
+                    `A rival merchant challenges ${protName} to a duel of deals.`,
+                    `A heated dispute over stall space erupts into a market-wide feud.`,
+                    `${antName} tries to sabotage ${protName}'s efforts at every turn.`,
+                    `A boycott threatens to shut down the market unless ${protName} intervenes.`,
+                    `A powerful guild opposes ${protName}'s reforms.`
+                ],
+                rumored: [
+                    `Rumors of sabotage spread as goods mysteriously spoil overnight.`,
+                    `A masked figure is seen tampering with scales and weights.`,
+                    `A secret auction for forbidden items draws dangerous attention.`,
+                    `A series of accidents is blamed on a market curse.`,
+                    `A rival claims ${protName} is behind the market's misfortunes.`
+                ],
+                madeUp: [
+                    `${protName} faces a band of ghostly pirates who want their favorite table back.`,
+                    `A magical storm threatens to sweep the market away.`,
+                    `A contest of magical bargains tests ${protName}'s cunning.`,
+                    `A living statue comes to life and challenges ${protName} for control of the market.`,
+                    `A time loop traps the market in the same day until ${protName} breaks the spell.`
+                ]
             }
         },
-        // If Act 1 was about tavern/social issues...
         tavern: {
             adventure: {
-                confirmed: `Motivated by the social tensions dividing the community, ${protName} decides to bring people together...`,
-                rumored: `Following mysterious social whispers and tavern gossip, ${protName} investigates with help from ${supportName}...`,
-                madeUp: `Empowered by ancient social magic, ${protName} sets out to heal the community's fractured bonds...`
+                confirmed: [
+                    `${protName} sets out to unite the tavern's patrons for a common cause.`,
+                    `A legendary drinking contest is organized by ${protName} to lift spirits and uncover secrets.`,
+                    `${supportName} and ${protName} plan a night of music and tales to heal old wounds.`,
+                    `A mysterious stranger challenges ${protName} to a game of riddles.`,
+                    `${protName} leads a midnight rescue when a regular goes missing.`
+                ],
+                rumored: [
+                    `Whispers of a ghost haunting the tavern draw ${protName} into a night of investigation.`,
+                    `A secret passage is rumored to exist beneath the tavern, and ${protName} seeks it out.`,
+                    `A series of strange dreams shared by patrons leads ${protName} to search for their meaning.`,
+                    `A cursed cask is said to bring bad luck to whoever drinks from it.`,
+                    `A shadowy figure is seen slipping notes to the bard during performances.`
+                ],
+                madeUp: [
+                    `${protName} discovers the tavern is a crossroads for magical travelers.`,
+                    `A talking dog offers ${protName} a quest to find the lost song of the ages.`,
+                    `The tavern transforms into a floating inn for one enchanted night.`,
+                    `A magical brew grants visions of the future to all who partake.`,
+                    `A portal opens in the fireplace, leading to a realm of endless revelry.`
+                ]
             },
             discovery: {
-                confirmed: `Through community investigation, ${protName} and ${supportName} work to understand what's dividing people...`,
-                rumored: `Following cryptic social rumors and veiled threats, ${protName} discovers secrets that could unite or divide ${townInfo.name}...`,
-                madeUp: `With mystical empathy and supernatural insight, ${protName} unveils the hidden emotional currents of the community...`
+                confirmed: [
+                    `${protName} uncovers the true story behind the tavern's founding.`,
+                    `A hidden diary reveals the secret love affair of two regulars.`,
+                    `${supportName} helps ${protName} piece together clues from old bar tabs.`,
+                    `A forgotten songbook is found, containing the town's lost anthem.`,
+                    `A regular confesses to a long-held secret that changes everything.`
+                ],
+                rumored: [
+                    `A mysterious map is found carved into a table.`,
+                    `Rumors of a hidden treasure beneath the tavern circulate among the patrons.`,
+                    `A ghostly voice is heard singing at closing time.`,
+                    `A series of coded messages is discovered in the tavern's chalkboard menus.`,
+                    `A patron claims to have seen the tavern move to a new location overnight.`
+                ],
+                madeUp: [
+                    `${protName} finds a magical mug that never empties.`,
+                    `A song sung backwards reveals a hidden prophecy.`,
+                    `A faerie queen visits the tavern in disguise.`,
+                    `A game of cards with a wizard changes the town's fate.`,
+                    `A riddle contest with a sphinx brings wisdom and chaos.`
+                ]
             },
             conflict: {
-                confirmed: `The social problems inevitably lead ${protName} to confront ${antName} who may be sowing discord...`,
-                rumored: `Social conspiracies emerge as ${antName} works against ${protName}'s efforts to unite people...`,
-                madeUp: `${protName} battles the chaos-spirits that ${antName} has unleashed to divide the community...`
+                confirmed: [
+                    `A brawl erupts between rival factions, and only ${protName} can restore peace.`,
+                    `A cheating scandal threatens to tear the tavern community apart.`,
+                    `${antName} tries to turn the regulars against ${protName}.`,
+                    `A long-standing feud comes to a head over a spilled drink.`,
+                    `A new owner threatens to change everything the patrons love.`
+                ],
+                rumored: [
+                    `Rumors of poison in the ale spark panic.`,
+                    `A masked figure is seen sabotaging the entertainment.`,
+                    `A secret society meets in the tavern's back room.`,
+                    `A series of pranks escalates into open conflict.`,
+                    `A rival bard challenges ${protName} to a duel of songs.`
+                ],
+                madeUp: [
+                    `${protName} faces a band of ghostly pirates who want their favorite table back.`,
+                    `A magical storm traps everyone inside until a riddle is solved.`,
+                    `A contest of magical drinks leads to wild transformations.`,
+                    `A living painting leaps from the wall to challenge ${protName}.`,
+                    `A time loop forces the tavern to relive the same night until peace is made.`
+                ]
             }
         },
-        // If Act 1 was about government/political issues...
         government: {
             adventure: {
-                confirmed: `Motivated by the political corruption plaguing the town, ${protName} decides to work for real change in ${townInfo.name}...`,
-                rumored: `Following shadowy political whispers and coded messages, ${protName} investigates corruption with ${supportName}'s help...`,
-                madeUp: `Empowered by divine civic magic, ${protName} sets forth to bring justice to the realm...`
+                confirmed: [
+                    `${protName} is recruited to solve a crisis in the town council.`,
+                    `A daring heist is planned to recover stolen documents.`,
+                    `${supportName} and ${protName} work to expose corruption.`,
+                    `A diplomatic envoy arrives, and ${protName} must broker peace.`,
+                    `A mysterious law is discovered that could change everything.`
+                ],
+                rumored: [
+                    `Rumors of a coup reach ${protName}, who must act quickly.`,
+                    `A secret passage is said to connect the council chamber to the tavern.`,
+                    `A coded letter hints at a plot against the mayor.`,
+                    `A shadowy advisor is pulling strings behind the scenes.`,
+                    `A prophecy foretells the rise of a new leader.`
+                ],
+                madeUp: [
+                    `${protName} is visited by a spirit of governance, offering cryptic advice.`,
+                    `A magical contract binds the council to ancient rules.`,
+                    `A talking statue gives legal advice to all who ask.`,
+                    `A council meeting is interrupted by a rain of frogs.`,
+                    `A portal opens to a realm where laws are living beings.`
+                ]
             },
             discovery: {
-                confirmed: `Through careful political investigation, ${protName} and ${supportName} work to expose the truth about leadership...`,
-                rumored: `Following mysterious government rumors and secret meetings, ${protName} discovers secrets that could transform how ${townInfo.name} is governed...`,
-                madeUp: `With mystical insight and otherworldly wisdom, ${protName} reveals the hidden political forces at work...`
+                confirmed: [
+                    `${protName} uncovers evidence of embezzlement.`,
+                    `A hidden archive reveals the town's true history.`,
+                    `${supportName} helps ${protName} decode old council minutes.`,
+                    `A whistleblower comes forward with vital information.`,
+                    `A forgotten law is found that saves the town from disaster.`
+                ],
+                rumored: [
+                    `A mysterious ledger is found with strange entries.`,
+                    `Rumors of a secret society within the council abound.`,
+                    `A ghostly figure is seen in the council chamber at night.`,
+                    `A series of anonymous notes warns of impending danger.`,
+                    `A councilor is rumored to be a shapeshifter.`
+                ],
+                madeUp: [
+                    `${protName} finds a magical quill that writes the future.`,
+                    `A debate with a demon lawyer changes the town's fate.`,
+                    `A council meeting is held in a dream.`,
+                    `A magical census reveals everyone's secret wishes.`,
+                    `A law is passed that makes everyone sing for a day.`
+                ]
             },
             conflict: {
-                confirmed: `The political corruption inevitably leads ${protName} to directly challenge ${antName}'s authority and methods...`,
-                rumored: `Political conspiracies pit the corrupt ${antName} against the reformist ${protName}...`,
-                madeUp: `${protName} wages epic battle against the tyranny-demons commanded by ${antName}...`
+                confirmed: [
+                    `A power struggle erupts between council factions.`,
+                    `A vote of no confidence threatens the mayor.`,
+                    `${antName} tries to seize control of the council.`,
+                    `A heated debate turns into a shouting match.`,
+                    `A scandal rocks the government to its core.`
+                ],
+                rumored: [
+                    `Rumors of bribery and blackmail swirl.`,
+                    `A masked figure is seen tampering with ballots.`,
+                    `A secret trial is held in the dead of night.`,
+                    `A rival town tries to influence the council's decisions.`,
+                    `A magical curse is said to affect all councilors.`
+                ],
+                madeUp: [
+                    `${protName} faces a council of ghosts who demand justice.`,
+                    `A magical duel decides the fate of the town's laws.`,
+                    `A living law book argues with the council.`,
+                    `A time paradox threatens to undo all legislation.`,
+                    `A councilor is revealed to be an ancient dragon in disguise.`
+                ]
+            }
+        },
+        coastal: {
+            adventure: {
+                confirmed: [
+                    `${protName} leads a rescue mission after a shipwreck.`,
+                    `A storm threatens the harbor, and ${protName} must rally the townsfolk.`,
+                    `${supportName} and ${protName} organize a regatta to boost morale.`,
+                    `A mysterious island appears off the coast, and ${protName} sets sail to explore it.`,
+                    `A legendary sea monster is rumored to be nearby.`
+                ],
+                rumored: [
+                    `Whispers of a ghost ship reach the docks.`,
+                    `A message in a bottle hints at buried treasure.`,
+                    `A mermaid is seen singing at dawn.`,
+                    `A strange fog brings odd happenings to the shore.`,
+                    `A sailor claims to have seen a city beneath the waves.`
+                ],
+                madeUp: [
+                    `${protName} discovers a portal to an underwater kingdom.`,
+                    `A talking dolphin offers guidance on the tides.`,
+                    `A magical storm sweeps the town into another world.`,
+                    `A sea witch grants wishes for a price.`,
+                    `A festival of lights attracts visitors from the spirit realm.`
+                ]
+            },
+            discovery: {
+                confirmed: [
+                    `${protName} uncovers the truth behind a series of shipwrecks.`,
+                    `A hidden cove is found, filled with lost cargo.`,
+                    `${supportName} helps ${protName} decode an old sailor's journal.`,
+                    `A lighthouse keeper reveals a long-held secret.`,
+                    `A map is found that changes the town's understanding of the coast.`
+                ],
+                rumored: [
+                    `A mysterious current is said to pull ships off course.`,
+                    `Rumors of a sunken city abound.`,
+                    `A ghostly crew is seen rowing ashore at midnight.`,
+                    `A series of strange lights is spotted beneath the waves.`,
+                    `A fisherman claims to have caught a talking fish.`
+                ],
+                madeUp: [
+                    `${protName} finds a shell that lets them speak to sea creatures.`,
+                    `A magical pearl reveals visions of the past.`,
+                    `A kraken rises to demand tribute.`,
+                    `A ship sails into the sky, taking the town's hopes with it.`,
+                    `A storm of singing fish brings joy and confusion.`
+                ]
+            },
+            conflict: {
+                confirmed: [
+                    `A feud erupts between fishermen and merchants.`,
+                    `A pirate raid threatens the town's safety.`,
+                    `${antName} tries to seize control of the docks.`,
+                    `A dispute over salvage rights divides the community.`,
+                    `A blockade threatens to cut off vital supplies.`
+                ],
+                rumored: [
+                    `Rumors of sabotage on the docks spread.`,
+                    `A masked figure is seen tampering with nets.`,
+                    `A secret smuggling ring is uncovered.`,
+                    `A rival town is blamed for missing cargo.`,
+                    `A curse is said to haunt the lighthouse.`
+                ],
+                madeUp: [
+                    `${protName} faces a sea serpent summoned by a rival.`,
+                    `A magical whirlpool threatens to swallow the harbor.`,
+                    `A contest of sea shanties determines the town's fate.`,
+                    `A living wave challenges ${protName} to a riddle contest.`,
+                    `A time loop traps the town in an endless storm.`
+                ]
+            }
+        },
+        agricultural: {
+            adventure: {
+                confirmed: [
+                    `${protName} leads the planting of a new crop to save the town.`,
+                    `A drought threatens the fields, and ${protName} seeks a solution.`,
+                    `${supportName} and ${protName} organize a harvest festival.`,
+                    `A mysterious animal is seen in the orchards.`,
+                    `A legendary seed is rumored to bring prosperity.`
+                ],
+                rumored: [
+                    `Whispers of a blight spread among the farmers.`,
+                    `A scarecrow is said to come to life at night.`,
+                    `A hidden spring is rumored to cure any crop.`,
+                    `A farmer claims to have seen a fairy ring in the fields.`,
+                    `A series of crop circles appears overnight.`
+                ],
+                madeUp: [
+                    `${protName} discovers a talking tree with ancient wisdom.`,
+                    `A magical rain brings a bumper harvest.`,
+                    `A contest of enchanted vegetables is held.`,
+                    `A living scarecrow asks for help to break its curse.`,
+                    `A portal opens to a land of endless summer.`
+                ]
+            },
+            discovery: {
+                confirmed: [
+                    `${protName} uncovers the cause of a mysterious crop failure.`,
+                    `A hidden root cellar is found, filled with ancient seeds.`,
+                    `${supportName} helps ${protName} analyze soil samples.`,
+                    `A wise elder shares forgotten farming techniques.`,
+                    `A map is found that reveals lost irrigation channels.`
+                ],
+                rumored: [
+                    `A mysterious fungus is said to spread at night.`,
+                    `Rumors of a golden apple circulate.`,
+                    `A ghostly plowman is seen working the fields.`,
+                    `A series of strange footprints is found in the mud.`,
+                    `A farmer claims to have spoken with a spirit of the land.`
+                ],
+                madeUp: [
+                    `${protName} finds a seed that grows into a beanstalk reaching the clouds.`,
+                    `A magical scarecrow protects the fields from harm.`,
+                    `A rain of flowers transforms the countryside.`,
+                    `A contest of magical livestock is held.`,
+                    `A living pumpkin offers advice on the harvest.`
+                ]
+            },
+            conflict: {
+                confirmed: [
+                    `A dispute over water rights divides the farmers.`,
+                    `A plague of locusts threatens the crops.`,
+                    `${antName} tries to seize control of the granary.`,
+                    `A feud erupts between neighboring villages.`,
+                    `A new tax on produce sparks outrage.`
+                ],
+                rumored: [
+                    `Rumors of sabotage in the fields spread.`,
+                    `A masked figure is seen poisoning the well.`,
+                    `A secret society of farmers is uncovered.`,
+                    `A rival town is blamed for a failed harvest.`,
+                    `A curse is said to haunt the old mill.`
+                ],
+                madeUp: [
+                    `${protName} faces a giant mole tunneling beneath the fields.`,
+                    `A magical drought tests the town's resolve.`,
+                    `A contest of enchanted plows determines the future of the harvest.`,
+                    `A living cloud bargains for rain.`,
+                    `A time loop traps the town in an endless planting season.`
+                ]
             }
         }
     };
     
-    // Get the appropriate template
-    if (contextualTemplates[act1Choice.theme] && contextualTemplates[act1Choice.theme][act2Theme] && contextualTemplates[act1Choice.theme][act2Theme][type]) {
-        return contextualTemplates[act1Choice.theme][act2Theme][type];
-    }
+    // Pick a random template for the selected combination
+    const arr = contextualTemplates[act1Choice.theme]?.[act2Theme]?.[type];
+    if (arr && arr.length) return pick(arr);
     
     // Fallback to generic template if specific one doesn't exist
     return storyTemplates.act2[act2Theme][type].replace(/\[PROTAGONIST\]/g, protName)
@@ -6579,21 +7213,89 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
         // Market-based story progressions
         'market-adventure': {
             triumph: {
-                confirmed: `${protName}'s commercial venture succeeds beyond all expectations, establishing ${getSpecificSolution(act2Choice.theme, act1Choice.theme)}. ${supportName} helps coordinate the new prosperity, and the ${getSpecificProblem(act1Choice.theme)} become memories as ${townInfo.name} thrives with renewed commerce...`,
-                rumored: `${protName} returns from their mysterious trading journey with wealth and connections that seem almost too good to be true. Though ${supportName} questions the source of this fortune, the revival of ${townInfo.name}'s commerce speaks for itself...`,
-                madeUp: `${protName} discovers magical trade routes that connect ${townInfo.name} to markets in distant realms. With ${supportName} managing the mundane details, these mystical commercial ventures transform the town into a legendary trading hub...`
+                confirmed: `${protName}'s bold festival brings prosperity and joy, attracting new merchants and customers.`,
+                rumored: `${protName} returns with tales of a secret trade route, and the market flourishes mysteriously.`,
+                madeUp: `${protName} opens a portal to a magical bazaar, forever changing the town's fortunes.`
             },
             tragedy: {
-                confirmed: `${protName}'s ambitious trading venture collapses spectacularly, leaving them deeper in debt than before. Even ${supportName}'s practical support cannot salvage the situation. The ${getSpecificProblem(act1Choice.theme)} worsen as ${townInfo.name} loses what little commerce remained...`,
-                rumored: `${protName} disappears during their trading expedition, leaving only debts and broken promises. ${supportName} searches desperately for answers, but the truth of what befell ${protName} remains as elusive as the prosperity they sought...`,
-                madeUp: `${protName}'s mystical trading ventures anger powerful entities from other realms. ${antName} exploits these supernatural debts, and ${protName}'s attempt to restore commerce instead curses ${townInfo.name} with perpetual poverty...`
+                confirmed: `${protName}'s efforts end in disaster as the festival is ruined by sabotage.`,
+                rumored: `${protName} vanishes during a midnight auction, and the market falls into decline.`,
+                madeUp: `${protName}'s magical bargains backfire, cursing the market for a generation.`
             },
             change: {
-                confirmed: `${protName}'s trading venture brings unexpected results - not the windfall hoped for, but strange new connections that slowly reshape ${townInfo.name}'s economy. ${supportName} helps the community adapt to these shifting commercial realities...`,
-                rumored: `${protName}'s mysterious business dealings create ripple effects that ${supportName} struggles to understand. The market changes, but whether these transformations will benefit ${townInfo.name} remains to be seen...`,
-                madeUp: `${protName}'s magical commerce fundamentally alters the relationship between ${townInfo.name} and the concept of trade itself. With ${supportName}'s wisdom, the community learns to navigate an economy where value and meaning have been mystically redefined...`
+                confirmed: `${protName}'s reforms bring slow but steady improvement, changing the market's culture.`,
+                rumored: `${protName}'s mysterious deals create new opportunities, but also new risks.`,
+                madeUp: `${protName}'s magical contest leaves the market forever altered, with new rules and new wonders.`
             }
-        }
+        },
+        'tavern-adventure': {
+            triumph: {
+                confirmed: `${protName}'s legendary night of music and tales unites the town.`,
+                rumored: `${protName} uncovers the tavern's greatest secret, bringing peace to all.`,
+                madeUp: `${protName} opens a portal to a realm of endless revelry, forever changing the tavern.`
+            },
+            tragedy: {
+                confirmed: `${protName}'s efforts end in a brawl that leaves the tavern in ruins.`,
+                rumored: `${protName} vanishes after a ghostly encounter, and the tavern is never the same.`,
+                madeUp: `${protName}'s magical contest unleashes chaos, cursing the tavern for a generation.`
+            },
+            change: {
+                confirmed: `${protName}'s night of unity brings lasting change to the tavern's culture.`,
+                rumored: `${protName}'s mysterious songs create new traditions, but also new mysteries.`,
+                madeUp: `${protName}'s magical night leaves the tavern forever altered, with new rules and new wonders.`
+            }
+        },
+        'government-adventure': {
+            triumph: {
+                confirmed: `${protName}'s reforms bring prosperity and justice to the town.`,
+                rumored: `${protName} uncovers a plot and saves the council from disaster.`,
+                madeUp: `${protName} opens a portal to a realm of wise rulers, forever changing the council.`
+            },
+            tragedy: {
+                confirmed: `${protName}'s efforts end in scandal, and the council is dissolved.`,
+                rumored: `${protName} vanishes after exposing corruption, and the town is never the same.`,
+                madeUp: `${protName}'s magical reforms backfire, cursing the council for a generation.`
+            },
+            change: {
+                confirmed: `${protName}'s reforms bring slow but steady improvement, changing the council's culture.`,
+                rumored: `${protName}'s mysterious actions create new opportunities, but also new risks.`,
+                madeUp: `${protName}'s magical contest leaves the council forever altered, with new rules and new wonders.`
+            }
+        },
+        'coastal-adventure': {
+            triumph: {
+                confirmed: `${protName}'s daring rescue brings prosperity and hope to the town.`,
+                rumored: `${protName} uncovers the secret of the ghost ship, bringing peace to the harbor.`,
+                madeUp: `${protName} opens a portal to an underwater kingdom, forever changing the coast.`
+            },
+            tragedy: {
+                confirmed: `${protName}'s efforts end in disaster as the storm destroys the harbor.`,
+                rumored: `${protName} vanishes after a mermaid's song, and the coast is never the same.`,
+                madeUp: `${protName}'s magical contest unleashes chaos, cursing the coast for a generation.`
+            },
+            change: {
+                confirmed: `${protName}'s rescue brings lasting change to the town's relationship with the sea.`,
+                rumored: `${protName}'s mysterious actions create new opportunities, but also new risks.`,
+                madeUp: `${protName}'s magical night leaves the coast forever altered, with new rules and new wonders.`
+            }
+        },
+        'agricultural-adventure': {
+            triumph: {
+                confirmed: `${protName}'s harvest festival brings prosperity and joy to the town.`,
+                rumored: `${protName} uncovers the secret of the fairy ring, bringing peace to the fields.`,
+                madeUp: `${protName} opens a portal to a land of endless summer, forever changing the harvest.`
+            },
+            tragedy: {
+                confirmed: `${protName}'s efforts end in disaster as the drought destroys the crops.`,
+                rumored: `${protName} vanishes after a magical rain, and the fields are never the same.`,
+                madeUp: `${protName}'s magical contest unleashes chaos, cursing the harvest for a generation.`
+            },
+            change: {
+                confirmed: `${protName}'s festival brings lasting change to the town's farming culture.`,
+                rumored: `${protName}'s mysterious actions create new opportunities, but also new risks.`,
+                madeUp: `${protName}'s magical night leaves the fields forever altered, with new rules and new wonders.`
+            }
+        },
     };
     
     // Try to get specific contextual template
@@ -6631,7 +7333,7 @@ function generateAct3Text(act1Choice, act2Choice, act3Theme, type, characters) {
         triumph: {
             confirmed: `Through ${protName}'s ${actionWords[act2Choice.theme]}, they ${actionResults[act2Choice.theme]['triumph']} and systematically address the ${getSpecificProblem(act1Choice.theme)}. With ${supportName} coordinating community efforts, ${townInfo.name} finally overcomes its greatest challenges and prospers...`,
             rumored: `${protName}'s ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['triumph']} through mysterious means. While ${supportName} cannot fully understand what happened, the ${getSpecificProblem(act1Choice.theme)} begin to heal in ways no one expected...`,
-            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['triumph']} beyond mortal comprehension. With ${supportName} anchoring them to reality, they transform ${townInfo.name} into a realm where the ${getSpecificProblem(act1Choice.theme)} become sources of wonder rather than woe...`
+            madeUp: `${protName}'s magical ${actionWords[act2Choice.theme]} ${actionResults[act2Choice.theme]['triumph']} beyond mortal comprehension. With ${supportName}'s wisdom guiding them, they transform ${townInfo.name} into a realm where the ${getSpecificProblem(act1Choice.theme)} become sources of wonder rather than woe...`
         },
         tragedy: {
             confirmed: `Despite ${protName}'s ${actionWords[act2Choice.theme]}, they ${actionResults[act2Choice.theme]['tragedy']} and the ${getSpecificProblem(act1Choice.theme)} prove insurmountable. Even ${supportName}'s unwavering support cannot prevent ${townInfo.name} from facing its harsh destiny...`,
