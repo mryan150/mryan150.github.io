@@ -99,9 +99,40 @@ let gameState = {
     availableOpportunities: [], // Special opportunities unlocked by events
     bardNotifications: [], // Positive story material and achievements
     bardWarnings: [], // Warnings about potential negative consequences
-    pendingEventNotifications: [] // Notifications to show player about event impacts
+    pendingEventNotifications: [], // Notifications to show player about event impacts
+    // --- Bard Storytelling Stats ---
+    bardStats: {
+        real: 1,
+        rumor: 1,
+        madeUp: 1
+    }
 };
-
+function renderBardStats() {
+    // Remove any old bard-stats div outside the header
+    const oldStatsDiv = document.getElementById('bard-stats');
+    if (oldStatsDiv && !oldStatsDiv.closest('.player-stats')) {
+        oldStatsDiv.remove();
+    }
+    // Find the player-stats container in the header
+    const statsContainer = document.querySelector('.player-stats');
+    if (!statsContainer) return;
+    let statsDiv = statsContainer.querySelector('#bard-stats');
+    if (!statsDiv) {
+        statsDiv = document.createElement('span');
+        statsDiv.id = 'bard-stats';
+        statsDiv.style.marginLeft = '18px';
+        statsDiv.style.display = 'inline-block';
+        statsDiv.style.verticalAlign = 'middle';
+        statsContainer.appendChild(statsDiv);
+    }
+    statsDiv.innerHTML = `
+        <span style="color:#ffe4b5; font-weight:bold;">🎵 Bard Skill:</span>
+        <span style="color:#32cd32;">Real:</span> ${gameState.bardStats.real} &nbsp; 
+        <span style="color:#ffa500;">Rumor:</span> ${gameState.bardStats.rumor} &nbsp; 
+        <span style="color:#8ec6f8;">Made Up:</span> ${gameState.bardStats.madeUp}
+        <span style="font-size:0.9em; color:#ccc; margin-left:8px;">(Higher skill = better at winning over skeptics)</span>
+    `;
+}
 // --- CHARACTER-LOCATION COMPATIBILITY SYSTEM ---
 const locationCompatibility = {
     // Define which character types can logically appear in which locations
@@ -116,7 +147,7 @@ const locationCompatibility = {
         unlikely: [] // Market is accessible to most people
     },
     'Tavern': {
-        natural: ['Innkeeper', 'Barmaid', 'Barkeep', 'Merchant', 'Traveler', 'Guard', 'Farmer', 'Local Drunk', 'Serving wench', 'Traveling bard', 'Retired soldier'],
+        natural: ['Innkeeper', 'Barmaid', 'Barkeep', 'Merchant', 'Traveler', 'Guard', 'Farmer', 'Local Drunk', 'Serving wench', 'Traveling bard', 'Retired soldier', 'Tavern cook'],
         possible: ['Mayor', 'Priest', 'Doctor', 'Miner', 'Blacksmith', 'Butcher'], // Social visits
         unlikely: [] // Anyone could reasonably be in a tavern
     },
@@ -4537,6 +4568,9 @@ function updateUI() {
             });
         }
     }
+    
+    // Render bard stats
+    renderBardStats();
 }
 
 function updateTownDisplay(townInfo) {
@@ -4716,9 +4750,33 @@ function refreshLocationModal(locationKey) {
         const conversationsRemaining = gameState.maxConversationsPerDay - gameState.conversationsUsed;
         const canTalk = !alreadyTalked && conversationsRemaining > 0;
         
+        // Enhanced NPC display with observable characteristics (copied from visitLocation)
+        const char = npc.character;
+        const observableTraits = [];
+        if (char.personalityTrait) {
+            observableTraits.push(`${char.personalityTrait.trait}`);
+        }
+        if (char.psychologicalProfile && ['troubled', 'anxious', 'optimistic'].includes(char.psychologicalProfile.emotionalState)) {
+            observableTraits.push(`appears ${char.psychologicalProfile.emotionalState}`);
+        }
+        observableTraits.push(`${char.age} ${char.profession}`);
+        let relationshipHints = '';
+        if (char.relationships) {
+            const obviousRels = char.relationships.filter(rel => 
+                ['spouse', 'business_partner', 'enemy'].includes(rel.relationshipType)
+            );
+            if (obviousRels.length > 0) {
+                const relDesc = obviousRels.map(rel => 
+                    `${rel.relationshipType} of ${rel.targetName}`
+                ).join(', ');
+                relationshipHints = `<div style="font-size: 0.8em; color: #daa520; margin-top: 5px;">👥 Known to be: ${relDesc}</div>`;
+            }
+        }
         contentHTML += `
             <div class="npc-option" style="margin: 10px 0; padding: 10px; background: rgba(139, 69, 19, 0.3); border-radius: 5px;">
                 <strong>${npc.name}</strong>
+                <div style="font-size: 0.9em; color: #ccc; margin: 5px 0;">${observableTraits.join(' • ')}</div>
+                ${relationshipHints}
                 <p style="margin: 5px 0; font-style: italic;">"${npc.dialogue}"</p>
                 ${alreadyTalked ? 
                     '<p style="color: #32cd32;">✓ Already spoke with them today</p>' : 
@@ -7087,15 +7145,18 @@ function calculateAudienceSatisfaction() {
         
         // Event type preference (replaces old act1.type)
         const eventType = story.event ? story.event.type : 'madeUp';
+        let prefersType = false;
         if (preferences.truthLevel === eventType) {
             memberSatisfaction += 15;
             reaction.reasons.push(`loved the ${eventType} nature of the story`);
+            prefersType = true;
         } else if (
             (preferences.truthLevel === 'confirmed' && eventType === 'rumored') ||
             (preferences.truthLevel === 'rumored' && eventType === 'confirmed')
         ) {
             memberSatisfaction += 5; // Close enough
             reaction.reasons.push('appreciated the story\'s believability');
+            prefersType = false;
         } else {
             // Major mismatches cause strong negative reactions
             if (preferences.truthLevel === 'confirmed' && eventType === 'madeUp') {
@@ -7114,6 +7175,13 @@ function calculateAudienceSatisfaction() {
                 memberSatisfaction -= 10;
                 reaction.reasons.push(`preferred ${preferences.truthLevel} stories over ${eventType} ones`);
             }
+            prefersType = false;
+        }
+        // --- Bard stat bonus for mismatched types ---
+        if (!prefersType && gameState.bardStats && gameState.bardStats[eventType] !== undefined) {
+            const statBonus = gameState.bardStats[eventType] * 2;
+            memberSatisfaction += statBonus;
+            reaction.reasons.push(`was impressed by your skill with ${eventType} stories (+${statBonus})`);
         }
         
         // Location theme preference (replaces old act1.theme)
@@ -8962,7 +9030,13 @@ function resetGame() {
         availableOpportunities: [], // Special opportunities unlocked by events
         bardNotifications: [], // Positive story material and achievements
         bardWarnings: [], // Warnings about potential negative consequences
-        pendingEventNotifications: [] // Notifications to show player about event impacts
+        pendingEventNotifications: [], // Notifications to show player about event impacts
+        // --- Bard Storytelling Stats ---
+        bardStats: {
+            real: 1,
+            rumor: 1,
+            madeUp: 1
+        }
     };
     
     // Generate new random characters for the fresh game
