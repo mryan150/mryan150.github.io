@@ -4731,7 +4731,7 @@ function refreshLocationModal(locationKey) {
     const location = locations[locationKey];
     const content = document.getElementById('location-content');
     
-    let contentHTML = `<p>${location.description}</p><br>`;
+    let contentHTML = `<button class='close-modal-btn' onclick='closeModal()' title='Close'>&times;</button><p>${location.description}</p><br>`;
     
     // Show conversation status
     const conversationsRemaining = gameState.maxConversationsPerDay - gameState.conversationsUsed;
@@ -9447,3 +9447,18 @@ function updateCharacterSelectionUI() {
 
 // Initialize game when page loads
 window.onload = initGame; 
+window.addEventListener('DOMContentLoaded', function() {
+    ['location-modal', 'conversation-modal', 'instructions-modal', 'welcome-modal'].forEach(id => {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.addEventListener('click', function(event) {
+          if (event.target === modal) {
+            if (id === 'location-modal') closeModal();
+            if (id === 'conversation-modal') closeConversationModal();
+            if (id === 'instructions-modal') closeInstructions();
+            if (id === 'welcome-modal') modal.classList.add('hidden');
+          }
+        });
+      }
+    });
+  });
